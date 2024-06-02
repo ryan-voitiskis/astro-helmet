@@ -9,7 +9,7 @@ type BaseItem = {
 }
 
 type ContentItem = BaseItem & {
-	innerHTML: string
+	innerHTML?: string
 }
 
 type Tag = (BaseItem | ContentItem) & {
@@ -155,7 +155,7 @@ function renderHeadTag(item: BaseItem | ContentItem): string {
 	const attrs = renderAttrs(item)
 	return ['meta', 'link'].includes(item.tagName)
 		? `<${item.tagName} ${attrs} />`
-		: `<${item.tagName}${attrs && ' '}${attrs}>${item.innerHTML}</${
+		: `<${item.tagName}${attrs && ' '}${attrs}>${item.innerHTML || ''}</${
 				item.tagName
 			}>`
 }
