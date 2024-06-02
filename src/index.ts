@@ -1,5 +1,8 @@
 const DEFAULT_CHARSET = { charset: 'UTF-8' }
-const DEFAULT_VIEWPORT = { content: 'width=device-width, initial-scale=1' }
+const DEFAULT_VIEWPORT = {
+	name: 'viewport',
+	content: 'width=device-width, initial-scale=1'
+}
 
 type TagName = 'meta' | 'link' | 'style' | 'script' | 'noscript'
 
