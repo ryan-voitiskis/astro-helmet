@@ -31,7 +31,7 @@ export type HeadItems = {
 
 type MergedHeadItems = Required<HeadItems>
 
-export function renderHeadItems(headItems: HeadItems[]): string {
+export function renderHead(headItems: HeadItems[]): string {
 	const items = mergeHeadItems(headItems)
 	if (!items.title?.length) throw new Error('Missing title tag.')
 
