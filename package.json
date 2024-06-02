@@ -1,0 +1,21 @@
+{
+  "name": "astro-helmet",
+  "version": "0.0.1",
+  "description": "A document head manager for astro.",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest"
+  },
+  "keywords": [
+    "astro",
+    "head",
+    "seo",
+    "meta-tags",
+    "html-head",
+    "helmet",
+    "document-head",
+    "web-development"
+  ],
+  "author": "Ryan Voitiskis",
+  "license": "ISC"
+}
