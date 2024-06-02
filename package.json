@@ -1,26 +1,28 @@
 {
-  "name": "astro-helmet",
-  "type": "module",
-  "version": "0.0.1",
-  "description": "A document head manager for astro.",
-  "main": "index.js",
-  "scripts": {
-    "test": "vitest"
-  },
-  "keywords": [
-    "astro",
-    "head",
-    "seo",
-    "meta-tags",
-    "html-head",
-    "helmet",
-    "document-head",
-    "web-development"
-  ],
-  "author": "Ryan Voitiskis",
-  "license": "ISC",
-  "devDependencies": {
-    "prettier": "^3.3.0",
-    "typescript": "^5.4.5"
-  }
+	"name": "astro-helmet",
+	"type": "module",
+	"version": "0.0.1",
+	"description": "A document head manager for astro.",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsc",
+		"test": "vitest"
+	},
+	"keywords": [
+		"astro",
+		"head",
+		"seo",
+		"meta-tags",
+		"html-head",
+		"helmet",
+		"document-head",
+		"web-development"
+	],
+	"author": "Ryan Voitiskis",
+	"license": "ISC",
+	"devDependencies": {
+		"prettier": "^3.3.0",
+		"typescript": "^5.4.5"
+	}
 }
