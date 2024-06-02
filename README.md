@@ -1,5 +1,7 @@
 # astro-helmet
 
+`astro-helmet` is currently not fully tested. It is not recommended for production use at this time. Please use with caution and report any issues you encounter.
+
 `astro-helmet` is a utility for managing the document head of Astro projects. It allows you to define any head tags you need and render them to a string that can be included in your Astro layout. Head tags defined in layouts, pages and components can be easily merged and prioritised to ensure the correct order in the final document.
 
 ## Installation
@@ -25,7 +27,10 @@ const headItems: HeadItems = {
 		{ name: 'viewport', content: 'width=device-width, initial-scale=1' },
 		{ property: 'og:title', content: 'Your Page Title' }
 	],
-	link: [{ rel: 'stylesheet', href: '/styles/main.css' }],
+	link: [
+		{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+		{ rel: 'stylesheet', href: '/styles/main.css' }
+	],
 	script: [{ src: '/scripts/main.js', defer: true }]
 }
 
@@ -47,10 +52,47 @@ Then add the rendered `head` string to your Astro layout:
 
 ## Features
 
-- **Dynamic Head Management**: Easily manage and update your document's head tags.
-- **Priority Handling**: Control the order of head elements with priority settings.
-- **Extensible**: Add custom tags and attributes as needed.
-- **Defaults**: Default charset and viewport meta tags are included by default.
+### Priority Handling
+
+`astro-helmet` will order head items based on their priority. By default, items are ordered as follows:
+
+| priority | item                                          |
+| -------- | --------------------------------------------- |
+| \-3      | `<meta charset="">`                           |
+| \-2      | `<meta name="viewport">`                      |
+| \-1      | `<meta http-equiv="">`                        |
+| 0        | `<title>`                                     |
+| 10       | `<link rel="preconnect" />`                   |
+| 20       | `<script src="" async></script>`              |
+| 30       | `<style>` where innerHTML.includes('@import') |
+| 40       | `<script>`                                    |
+| 50       | `<link rel="stylesheet" />`                   |
+| 60       | `<link rel="preload" />`                      |
+| 70       | `<script src="" defer></script>`              |
+| 80       | `<link rel="prefetch" />`                     |
+| 90       | remaining `<link>`                            |
+| 100      | remaining `<meta>`                            |
+| 110      | anything else                                 |
+
+Control the order of head elements by adding `priority: number` to a head item.
+
+#### Usage
+
+```ts
+const headItems: HeadItems = {
+	// priority 1 will move the script to just below the <title>
+	script: [{ src: '/scripts/importantScript.js', defer: true, priority: 1 }]
+}
+```
+
+### Defaults
+
+Default charset and viewport meta tags are included by default.
+
+```ts
+const DEFAULT_CHARSET = { charset: 'UTF-8' }
+const DEFAULT_VIEWPORT = { content: 'width=device-width, initial-scale=1' }
+```
 
 ## Contributing
 
