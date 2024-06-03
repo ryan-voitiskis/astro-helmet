@@ -168,8 +168,20 @@ export function renderAttrs(item: BaseItem | ContentItem): string {
 		.filter(([key]) => !['innerHTML', 'priority', 'tagName'].includes(key))
 		.map(([key, value]) => {
 			if (typeof value === 'boolean') return value ? key : ''
-			else return `${key}="${value}"`
+			else if (value === null || value === undefined) return ''
+			else return `${key}="${escapeHtml(String(value))}"`
 		})
 		.filter((attr) => attr !== '')
 		.join(' ')
+}
+
+function escapeHtml(str: string): string {
+	const escapeMap: Record<string, string> = {
+		'"': '&quot;',
+		'&': '&amp;',
+		'<': '&lt;',
+		'>': '&gt;'
+	}
+
+	return str.replace(/["&<>]/g, (match) => escapeMap[match] || match)
 }

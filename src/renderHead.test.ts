@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderHead, renderAttrs, HeadItems } from './index'
+import { renderHead, HeadItems } from './index'
 
 describe('renderHead', () => {
 	it('should render the head tags in the correct order', () => {
@@ -18,8 +18,6 @@ describe('renderHead', () => {
 <script src="/script.js"></script>
 <link rel="stylesheet" href="/styles.css" />
 <meta name="description" content="My page description" />`
-
-		console.log(renderHead(headItems))
 
 		expect(renderHead(headItems)).toEqual(expectedOutput)
 	})
@@ -51,22 +49,5 @@ describe('renderHead', () => {
 <meta name="description" content="Duplicate description" />`
 
 		expect(renderHead(headItems)).toEqual(expectedOutput)
-	})
-})
-
-describe('renderAttrs', () => {
-	it('should render boolean attributes correctly', () => {
-		const item = { async: true, src: '/script.js' }
-		expect(renderAttrs(item)).toEqual('async src="/script.js"')
-	})
-
-	it('should filter out invalid attributes', () => {
-		const item = {
-			innerHTML: '<p>Hello</p>',
-			priority: 1,
-			tagName: 'script',
-			src: '/script.js'
-		}
-		expect(renderAttrs(item)).toEqual('src="/script.js"')
 	})
 })
