@@ -34,6 +34,7 @@ export type HeadItems = {
 
 type MergedHeadItems = Required<HeadItems>
 
+// TODO: takes either a single HeadItems object or an array of HeadItems
 export function renderHead(headItems: HeadItems[]): string {
 	const items = mergeHeadItems(headItems)
 	if (!items.title?.length) throw new Error('Missing title tag.')
@@ -157,7 +158,7 @@ function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
 function renderHeadTag(item: BaseItem | ContentItem): string {
 	const attrs = renderAttrs(item)
 	return ['meta', 'link'].includes(item.tagName)
-		? `<${item.tagName} ${attrs} />`
+		? `<${item.tagName} ${attrs}>`
 		: `<${item.tagName}${attrs && ' '}${attrs}>${item.innerHTML || ''}</${
 				item.tagName
 			}>`
