@@ -58,8 +58,9 @@ Then add the rendered `head` string to your Astro layout:
 
 | priority | item                                          |
 | -------- | --------------------------------------------- |
-| \-3      | `<meta charset="">`                           |
-| \-2      | `<meta name="viewport">`                      |
+| \-4      | `<meta charset="">`                           |
+| \-3      | `<meta name="viewport">`                      |
+| \-2      | `<base ="">`                                  |
 | \-1      | `<meta http-equiv="">`                        |
 | 0        | `<title>`                                     |
 | 10       | `<link rel="preconnect" />`                   |

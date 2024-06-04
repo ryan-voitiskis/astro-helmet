@@ -4,7 +4,15 @@ const DEFAULT_VIEWPORT = {
 	content: 'width=device-width, initial-scale=1'
 }
 
-type TagName = 'meta' | 'link' | 'style' | 'script' | 'noscript'
+type TagName = 'base' | 'meta' | 'link' | 'style' | 'script' | 'noscript'
+const tagNames: TagName[] = [
+	'base',
+	'meta',
+	'link',
+	'style',
+	'script',
+	'noscript'
+]
 
 type BaseItem = {
 	[key: string]: any
@@ -25,6 +33,7 @@ type PrioritisedTag = Tag & {
 
 export type HeadItems = {
 	title?: string
+	base?: BaseItem[]
 	meta?: BaseItem[]
 	link?: BaseItem[]
 	style?: ContentItem[]
@@ -40,7 +49,6 @@ export function renderHead(headItems: HeadItems[]): string {
 	if (!items.title?.length) throw new Error('Missing title tag.')
 
 	const tags: Tag[] = []
-	const tagNames: TagName[] = ['meta', 'link', 'style', 'script', 'noscript']
 	tagNames.forEach((tag) => {
 		tags.push(...items[tag].map((item) => ({ ...item, tagName: tag })))
 	})
@@ -67,6 +75,7 @@ export function renderHead(headItems: HeadItems[]): string {
 function mergeHeadItems(items: HeadItems[]): MergedHeadItems {
 	const mergedHeadItems: MergedHeadItems = {
 		title: '',
+		base: [],
 		meta: [],
 		link: [],
 		style: [],
@@ -76,6 +85,7 @@ function mergeHeadItems(items: HeadItems[]): MergedHeadItems {
 
 	items.forEach((item) => {
 		if (item.title && item.title.length) mergedHeadItems.title = item.title
+		if (item.base) mergedHeadItems.base.push(...item.base)
 		if (item.meta) mergedHeadItems.meta.push(...item.meta)
 		if (item.link) mergedHeadItems.link.push(...item.link)
 		if (item.style) mergedHeadItems.style.push(...item.style)
@@ -84,6 +94,7 @@ function mergeHeadItems(items: HeadItems[]): MergedHeadItems {
 	})
 
 	mergedHeadItems.meta = deduplicateMetaItems(mergedHeadItems.meta)
+	mergedHeadItems.base = mergedHeadItems.base.slice(-1)
 
 	return mergedHeadItems
 }
@@ -100,9 +111,12 @@ function applyDefaultPriorities(tags: Tag[]): PrioritisedTag[] {
 	unprioritisedTags.forEach((tag) => {
 		let priority: number
 		switch (tag.tagName) {
+			case 'base':
+				priority = -2
+				break
 			case 'meta':
-				if (tag.charset) priority = -3
-				else if (tag.name === 'viewport') priority = -2
+				if (tag.charset) priority = -4
+				else if (tag.name === 'viewport') priority = -3
 				else if (tag['http-equiv']) priority = -1
 				else priority = 100
 				break
@@ -136,10 +150,10 @@ function applyDefaultPriorities(tags: Tag[]): PrioritisedTag[] {
 
 function applyDefaultTags(tags: PrioritisedTag[]): PrioritisedTag[] {
 	if (!tags.some((tag) => tag.tagName === 'meta' && tag.charset))
-		tags.push({ ...DEFAULT_CHARSET, tagName: 'meta', priority: -3 })
+		tags.push({ ...DEFAULT_CHARSET, tagName: 'meta', priority: -4 })
 
 	if (!tags.some((tag) => tag.tagName === 'meta' && tag.name === 'viewport'))
-		tags.push({ ...DEFAULT_VIEWPORT, tagName: 'meta', priority: -2 })
+		tags.push({ ...DEFAULT_VIEWPORT, tagName: 'meta', priority: -3 })
 
 	return tags
 }
@@ -157,7 +171,7 @@ function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
 
 function renderHeadTag(item: BaseItem | ContentItem): string {
 	const attrs = renderAttrs(item)
-	return ['meta', 'link'].includes(item.tagName)
+	return ['meta', 'link', 'base'].includes(item.tagName)
 		? `<${item.tagName} ${attrs}>`
 		: `<${item.tagName}${attrs && ' '}${attrs}>${item.innerHTML || ''}</${
 				item.tagName
