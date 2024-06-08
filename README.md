@@ -1,8 +1,16 @@
 # astro-helmet
 
-`astro-helmet` is currently not fully tested. It is not recommended for production use at this time. Please use with caution and report any issues you encounter.
+`astro-helmet` is a utility for managing the document head of Astro projects. It provides an Astro component `Helmet` which accepts an object of head items and renders them in the document head.
 
-`astro-helmet` is a utility for managing the document head of Astro projects. It allows you to define any head tags you need and render them to a string that can be included in your Astro layout. Head tags defined in layouts, pages and components can be easily merged and prioritised to ensure the correct order in the final document.
+## Features
+
+- Render head items in the document head, specified in object(s).
+- Merge head items from multiple sources.
+- Control the order of head items.
+- Include default charset and viewport meta tags.
+- Order head items with default or specified priority.
+- Meta tag deduplication.
+- Flexible API for adding head items and tag attributes.
 
 ## Installation
 
@@ -14,47 +22,150 @@ npm install astro-helmet
 
 ## Usage
 
-To use `astro-helmet`, you need to import the `Helmet` component and use it in your Astro project. Here's an example:
-
-```ts
-import { renderHead, type HeadItems } from 'astro-helmet'
-
-// Define your head items
-const headItems: HeadItems = {
-	title: 'Your Page Title',
-	meta: [
-		{ charset: 'UTF-8' },
-		{ name: 'viewport', content: 'width=device-width, initial-scale=1' },
-		{ property: 'og:title', content: 'Your Page Title' }
-	],
-	link: [
-		{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-		{ rel: 'stylesheet', href: '/styles/main.css' }
-	],
-	script: [{ src: '/scripts/main.js', defer: true }]
-}
-
-// Call the render function to create the HTML string for the the head items
-const head = renderHead([headItems])
-```
-
-Then add the rendered `head` string to your Astro layout:
+In your Layout component, import `astro-helmet` and pass an object of `headItems` to the `Helmet` component.
 
 ```astro
+---
+import Helmet from 'astro-helmet'
+
+const headItems = {
+	title: 'My Site Title',
+	base: [{ href: 'https://example.com' }],
+	meta: [
+		{ name: 'description', content: 'My site description' },
+		{ property: 'og:type', content: 'website' }
+	],
+	link: [{ rel: 'stylesheet', href: 'styles.css' }],
+	style: [{ innerHTML: 'body { color: red; }' }],
+	script: [{ innerHTML: 'console.log("Hello, world!")' }],
+	noscript: [{ innerHTML: 'Please enable JavaScript' }]
+}
+---
+
+<!doctype html>
+<html lang="en">
+	<Helmet {headItems} />
+	<body></body>
+</html>
+
+```
+
+Any attribute can be added to a head item. Simply provide the attribute as a key-value pair in the object.
+
+`'innerHTML', 'priority', 'tagName'` are reserved keys and cannot not be used as attributes.
+
+To add content to a tag, use the `innerHTML` key. This will render the content inside the tag.
+
+To control the order of head items, use the `priority` key.
+
+```ts
+const headItems: HeadItems = {
+	// priority 1 will move the script to just below the <title>
+	script: [{ src: '/scripts/importantScript.js', defer: true, priority: 1 }]
+}
+```
+
+See `applyPriority()` in the [Options](#options) section for more information on controlling the order of head items.
+
+You can also pass an array of `headItems` to the `Helmet` component:
+
+```astro
+---
+import Helmet from 'astro-helmet'
+import type { HeadItems } from 'astro-helmet'
+
+interface Props {
+	headItems: HeadItems
+}
+
+const layoutHeadItems: HeadItems = {
+	link: [
+		{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+		{ rel: 'sitemap', href: '/sitemap-index.xml' }
+	],
+	meta: [{ property: 'og:type', content: 'website' }]
+}
+
+const { headItems: pageHeadItems } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+	<Helmet headItems={[layoutHeadItems, pageHeadItems]} />
+	<body></body>
+</html>
+```
+
+Then in your page components (or elsewhere), you can define additional head items:
+
+```astro
+---
+import type { HeadItems } from 'astro-helmet'
+
+const headItems: HeadItems = {
+	title: 'My Site Title',
+	meta: [{ name: 'description', content: 'My site description' }],
+	link: [{ rel: 'canonical', href: "https://example.com" }]
+}
+---
+
+<Layout {headItems}>
+	<main>content</main>
+</Layout>
+```
+
+### Deduplication
+
+When provided with an array of `headItems`, `astro-helmet` will merge the items together.
+
+`headItems.meta` are deduplicated by `name`, `property` and `http-equiv`.
+Meta items later in the array replace earlier items.
+
+`title` and `base` items are also deduplicated, with the last item in the array taking precedence.
+
+### Props
+
+The `Helmet` component takes two props:
+
+```ts
+interface Props {
+	headItems: HeadItems | HeadItems[]
+	options?: {
+		omitHeadTags?: boolean
+		applyPriority?: (tag: Tag) => Required<Tag>
+	}
+}
+```
+
+### Options
+
+#### `omitHeadTags`
+
+By default, `astro-helmet` will render the <head> opening and closing tags around the head items. If you want it to render only the head items, set `omitHeadTags` to `true`.
+
+
+```astro
+---
+import Helmet from 'astro-helmet'
+
+const headItems = { title: 'My Site Title' }
+const options = { omitHeadTags: true }
+---
+
 <!doctype html>
 <html lang="en">
 	<head>
-		<Fragment set:html={head} />
+		<Helmet {headItems} {options} />
 	</head>
-	<body>
-  ...
+	<body></body>
+</html>
 ```
 
-## Features
+#### `applyPriority()`
 
-### Priority Handling
+The `applyPriority` option allows you to customize the priority of head items. It takes a function that accepts a `Tag` object and returns a `Tag` object with the priority applied.
 
-`astro-helmet` will order head items based on their priority. By default, items are ordered as follows:
+By default, items are ordered as follows:
 
 | priority | item                                          |
 | -------- | --------------------------------------------- |
@@ -75,18 +186,56 @@ Then add the rendered `head` string to your Astro layout:
 | 100      | remaining `<meta>`                            |
 | 110      | anything else                                 |
 
-Control the order of head elements by adding `priority: number` to a head item.
-
-#### Usage
+This is the default implementation of `applyPriority()`:
 
 ```ts
-const headItems: HeadItems = {
-	// priority 1 will move the script to just below the <title>
-	script: [{ src: '/scripts/importantScript.js', defer: true, priority: 1 }]
+function applyPriority(tag: Tag): Required<Tag> {
+	if (typeof tag.priority === 'number') return tag as Required<Tag>
+	let priority: number
+	switch (tag.tagName) {
+		case 'title':
+			priority = 0
+			break
+
+		case 'base':
+			priority = -2
+			break
+
+		case 'meta':
+			if (tag.charset) priority = -4
+			else if (tag.name === 'viewport') priority = -3
+			else if (tag['http-equiv']) priority = -1
+			else priority = 100
+			break
+
+		case 'link':
+			if (tag.rel === 'preconnect') priority = 10
+			else if (tag.rel === 'preload') priority = 60
+			else if (tag.rel === 'prefetch') priority = 80
+			else if (tag.rel === 'stylesheet') priority = 50
+			else priority = 90
+			break
+
+		case 'style':
+			priority = tag.innerHTML.includes('@import') ? 30 : 51
+			break
+
+		case 'script':
+			if (tag.async) priority = 20
+			else if (tag.defer) priority = 70
+			else priority = 40
+			break
+
+		default:
+			priority = 110
+	}
+	return { ...tag, priority }
 }
 ```
 
-### Defaults
+Provide a custom `applyPriority()` function to reorder head items as needed.
+
+## Defaults
 
 Default charset and viewport meta tags are included by default.
 

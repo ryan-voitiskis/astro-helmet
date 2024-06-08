@@ -1,6 +1,11 @@
 import { renderHead, type HeadItems } from '../src/main'
 import { describe, it, expect } from 'vitest'
 
+// TODO: don't use array
+// TODO: add test for missing title tag
+// TODO: add test for deduplicateMetaItems
+// TODO: add test for multiple titles specified
+
 type TestCase = {
 	description: string
 	params: HeadItems[]
