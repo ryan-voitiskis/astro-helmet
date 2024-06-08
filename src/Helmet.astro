@@ -3,7 +3,7 @@ import { type HeadItems, type Tag, renderHead } from './main'
 
 interface Props {
 	headItems: HeadItems | HeadItems[]
-	options: {
+	options?: {
 		omitHeadTags?: boolean
 		applyPriority?: (tag: Tag) => Required<Tag>
 	}
