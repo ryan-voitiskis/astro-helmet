@@ -5,7 +5,7 @@ export default {
 	trailingComma: 'none',
 	tabWidth: 2,
 	semi: false,
-	plugins: ['./node_modules/prettier-plugin-astro'],
+	plugins: ['prettier-plugin-astro'],
 	overrides: [
 		{
 			files: '*.astro',

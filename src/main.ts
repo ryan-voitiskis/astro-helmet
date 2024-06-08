@@ -185,5 +185,5 @@ function escapeHtml(str: string): string {
 		'>': '&gt;'
 	}
 
-	return str.replace(/["&<>]/g, (match) => escapeMap[match] || match)
+	return str.replace(/["&<>]/g, (match) => escapeMap[match])
 }

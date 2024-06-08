@@ -1,113 +1,121 @@
 import { renderAttrs } from '../src/main'
 import { describe, it, expect } from 'vitest'
 
-const testCases = [
-	{
-		description: 'Preload a font with standard attributes',
-		attributes: {
+describe('renderAttrs', () => {
+	it('Preload a font with standard attributes', () => {
+		const attributes = {
 			rel: 'preload',
 			as: 'font',
 			type: 'font/woff2',
 			crossorigin: 'anonymous',
 			href: '/fonts/InterVariable.woff2'
-		},
-		expected:
+		}
+		const expected =
 			'rel="preload" as="font" type="font/woff2" crossorigin="anonymous" href="/fonts/InterVariable.woff2"'
-	},
-	{
-		description: 'Link a stylesheet with standard attributes',
-		attributes: {
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Link a stylesheet with standard attributes', () => {
+		const attributes = {
 			rel: 'stylesheet',
 			href: '/css/styles.css'
-		},
-		expected: 'rel="stylesheet" href="/css/styles.css"'
-	},
-	{
-		description: "Preload font with missing 'as' attribute",
-		attributes: {
+		}
+		const expected = 'rel="stylesheet" href="/css/styles.css"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it("Preload font with missing 'as' attribute", () => {
+		const attributes = {
 			rel: 'preload',
 			type: 'font/woff2',
 			crossorigin: 'anonymous',
 			href: '/fonts/InterVariable.woff2'
-		},
-		expected:
+		}
+		const expected =
 			'rel="preload" type="font/woff2" crossorigin="anonymous" href="/fonts/InterVariable.woff2"'
-	},
-	{
-		description: 'Use non-standard rel attribute',
-		attributes: {
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Use non-standard rel attribute', () => {
+		const attributes = {
 			rel: 'data',
 			href: '/data/config.json'
-		},
-		expected: 'rel="data" href="/data/config.json"'
-	},
-	{
-		description: 'Link tag with invalid type attribute for CSS',
-		attributes: {
+		}
+		const expected = 'rel="data" href="/data/config.json"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Link tag with invalid type attribute for CSS', () => {
+		const attributes = {
 			rel: 'stylesheet',
 			type: 'text/plain',
 			href: '/css/styles.css'
-		},
-		expected: 'rel="stylesheet" type="text/plain" href="/css/styles.css"'
-	},
-	{
-		description: 'Attributes with boolean values',
-		attributes: {
+		}
+		const expected = 'rel="stylesheet" type="text/plain" href="/css/styles.css"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Attributes with boolean values', () => {
+		const attributes = {
 			async: true,
 			defer: false,
 			src: '/js/script.js'
-		},
-		expected: 'async src="/js/script.js"'
-	},
-	{
-		description: 'Attributes with special characters',
-		attributes: {
+		}
+		const expected = 'async src="/js/script.js"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Attributes with special characters', () => {
+		const attributes = {
 			'data-test': 'value with spaces',
 			'data-test2': 'value with "quotes"',
 			src: '/js/script.js'
-		},
-		expected:
+		}
+		const expected =
 			'data-test="value with spaces" data-test2="value with &quot;quotes&quot;" src="/js/script.js"'
-	},
-	{
-		description: 'Attributes with empty values',
-		attributes: {
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Attributes with empty values', () => {
+		const attributes = {
 			rel: '',
 			href: '/css/styles.css'
-		},
-		expected: 'rel="" href="/css/styles.css"'
-	},
-	{
-		description: 'Attributes with undefined values',
-		attributes: {
+		}
+		const expected = 'rel="" href="/css/styles.css"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Attributes with undefined values', () => {
+		const attributes = {
 			rel: undefined,
 			href: '/css/styles.css'
-		},
-		expected: 'href="/css/styles.css"'
-	},
-	{
-		description: 'Attributes with null values',
-		attributes: {
+		}
+		const expected = 'href="/css/styles.css"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Attributes with null values', () => {
+		const attributes = {
 			rel: null,
 			href: '/css/styles.css'
-		},
-		expected: 'href="/css/styles.css"'
-	},
-	{
-		description: 'Attributes with number values',
-		attributes: {
+		}
+		const expected = 'href="/css/styles.css"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
+	it('Attributes with number values', () => {
+		const attributes = {
 			width: 100,
 			height: 200,
 			src: '/img/image.jpg'
-		},
-		expected: 'width="100" height="200" src="/img/image.jpg"'
-	}
-]
+		}
+		const expected = 'width="100" height="200" src="/img/image.jpg"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
 
-describe('renderAttrs', () => {
-	testCases.forEach(({ description, attributes, expected }) => {
-		it(description, () => {
-			expect(renderAttrs(attributes)).toEqual(expected)
-		})
+	it('No attributes', () => {
+		const attributes = {}
+		const expected = ''
+		expect(renderAttrs(attributes)).toEqual(expected)
 	})
 })
