@@ -47,7 +47,6 @@ const headItems = {
 	<Helmet {headItems} />
 	<body></body>
 </html>
-
 ```
 
 Any attribute can be added to a head item. Simply provide the attribute as a key-value pair in the object.
@@ -105,7 +104,7 @@ import type { HeadItems } from 'astro-helmet'
 const headItems: HeadItems = {
 	title: 'My Site Title',
 	meta: [{ name: 'description', content: 'My site description' }],
-	link: [{ rel: 'canonical', href: "https://example.com" }]
+	link: [{ rel: 'canonical', href: 'https://example.com' }]
 }
 ---
 
@@ -143,7 +142,6 @@ interface Props {
 
 By default, `astro-helmet` will render the <head> opening and closing tags around the head items. If you want it to render only the head items, set `omitHeadTags` to `true`.
 
-
 ```astro
 ---
 import Helmet from 'astro-helmet'
@@ -171,7 +169,7 @@ By default, items are ordered as follows:
 | -------- | --------------------------------------------- |
 | \-4      | `<meta charset="">`                           |
 | \-3      | `<meta name="viewport">`                      |
-| \-2      | `<base ="">`                                  |
+| \-2      | `<base href="">`                              |
 | \-1      | `<meta http-equiv="">`                        |
 | 0        | `<title>`                                     |
 | 10       | `<link rel="preconnect" />`                   |
@@ -246,6 +244,8 @@ const DEFAULT_VIEWPORT = {
 	content: 'width=device-width, initial-scale=1'
 }
 ```
+
+These can be overridden by providing your own `meta` items.
 
 ## Contributing
 
