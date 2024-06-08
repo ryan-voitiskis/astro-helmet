@@ -4,15 +4,14 @@ const DEFAULT_VIEWPORT = {
 	content: 'width=device-width, initial-scale=1'
 }
 
-type TagName = 'base' | 'meta' | 'link' | 'style' | 'script' | 'noscript'
-const tagNames: TagName[] = [
-	'base',
-	'meta',
-	'link',
-	'style',
-	'script',
-	'noscript'
-]
+type TagName =
+	| 'title'
+	| 'base'
+	| 'meta'
+	| 'link'
+	| 'style'
+	| 'script'
+	| 'noscript'
 
 type BaseItem = {
 	[key: string]: any
@@ -25,10 +24,7 @@ type ContentItem = BaseItem & {
 
 type Tag = (BaseItem | ContentItem) & {
 	tagName: TagName
-}
-
-type PrioritisedTag = Tag & {
-	priority: number
+	priority?: number
 }
 
 export type HeadItems = {
@@ -41,121 +37,107 @@ export type HeadItems = {
 	noscript?: ContentItem[]
 }
 
-type MergedHeadItems = Required<HeadItems>
+export function renderHead(headItems: HeadItems | HeadItems[]): string {
+	const items = Array.isArray(headItems)
+		? mergeHeadItems(headItems.map((i) => normaliseHeadItems(i)))
+		: normaliseHeadItems(headItems)
 
-// TODO: takes either a single HeadItems object or an array of HeadItems
-export function renderHead(headItems: HeadItems[]): string {
-	const items = mergeHeadItems(headItems)
 	if (!items.title?.length) throw new Error('Missing title tag.')
 
-	const tags: Tag[] = []
-	tagNames.forEach((tag) => {
-		tags.push(...items[tag].map((item) => ({ ...item, tagName: tag })))
-	})
+	items.meta = deduplicateMetaItems(items.meta)
+	items.base = items.base.slice(-1)
 
-	let prioritisedTags = applyDefaultPriorities(tags)
-	prioritisedTags = applyDefaultTags(prioritisedTags)
+	const { title, ...rest } = items
+	const tags: Tag[] = Object.entries(rest).flatMap(([tagName, tagItems]) =>
+		tagItems.map((item) => ({ ...item, tagName }) as Tag)
+	)
+	tags.push({ tagName: 'title', innerHTML: items.title })
+	tags.push(...getDefaultTags(tags))
+
+	const prioritisedTags = tags.map((tag) => applyPriority(tag)) // TODO: use applyPriority from options if provided
 
 	const orderedTags = prioritisedTags.sort((a, b) => a.priority - b.priority)
 
-	const preTitleTags = orderedTags
-		.filter((i) => i.priority < 0)
-		.map((item) => renderHeadTag(item))
-	const postTitleTags = orderedTags
-		.filter((i) => i.priority > 0)
-		.map((item) => renderHeadTag(item))
-
-	return [
-		...preTitleTags,
-		`<title>${items.title}</title>`,
-		...postTitleTags
-	].join('\n')
+	return orderedTags.map((i) => renderHeadTag(i)).join('\n')
 }
 
-function mergeHeadItems(items: HeadItems[]): MergedHeadItems {
-	const mergedHeadItems: MergedHeadItems = {
-		title: '',
-		base: [],
-		meta: [],
-		link: [],
-		style: [],
-		script: [],
-		noscript: []
+function normaliseHeadItems(items: HeadItems): Required<HeadItems> {
+	return {
+		title: items.title || '',
+		base: items.base || [],
+		meta: items.meta || [],
+		link: items.link || [],
+		style: items.style || [],
+		script: items.script || [],
+		noscript: items.noscript || []
 	}
-
-	items.forEach((item) => {
-		if (item.title && item.title.length) mergedHeadItems.title = item.title
-		if (item.base) mergedHeadItems.base.push(...item.base)
-		if (item.meta) mergedHeadItems.meta.push(...item.meta)
-		if (item.link) mergedHeadItems.link.push(...item.link)
-		if (item.style) mergedHeadItems.style.push(...item.style)
-		if (item.script) mergedHeadItems.script.push(...item.script)
-		if (item.noscript) mergedHeadItems.noscript.push(...item.noscript)
-	})
-
-	mergedHeadItems.meta = deduplicateMetaItems(mergedHeadItems.meta)
-	mergedHeadItems.base = mergedHeadItems.base.slice(-1)
-
-	return mergedHeadItems
 }
 
-function applyDefaultPriorities(tags: Tag[]): PrioritisedTag[] {
-	const prioritisedTags: PrioritisedTag[] = []
-	const unprioritisedTags: Tag[] = []
-
-	tags.forEach((tag) => {
-		if (tag.priority !== undefined) prioritisedTags.push(tag as PrioritisedTag)
-		else unprioritisedTags.push(tag)
+function mergeHeadItems(items: Required<HeadItems>[]): Required<HeadItems> {
+	return items.reduce((merged, item) => {
+		merged.title = item.title || merged.title
+		merged.base.push(...item.base)
+		merged.meta.push(...item.meta)
+		merged.link.push(...item.link)
+		merged.style.push(...item.style)
+		merged.script.push(...item.script)
+		merged.noscript.push(...item.noscript)
+		return merged
 	})
-
-	unprioritisedTags.forEach((tag) => {
-		let priority: number
-		switch (tag.tagName) {
-			case 'base':
-				priority = -2
-				break
-			case 'meta':
-				if (tag.charset) priority = -4
-				else if (tag.name === 'viewport') priority = -3
-				else if (tag['http-equiv']) priority = -1
-				else priority = 100
-				break
-
-			case 'link':
-				if (tag.rel === 'preconnect') priority = 10
-				else if (tag.rel === 'preload') priority = 60
-				else if (tag.rel === 'prefetch') priority = 80
-				else if (tag.rel === 'stylesheet') priority = 50
-				else priority = 90
-				break
-
-			case 'style':
-				priority = tag.innerHTML.includes('@import') ? 30 : 51
-				break
-
-			case 'script':
-				if (tag.async) priority = 20
-				else if (tag.defer) priority = 70
-				else priority = 40
-				break
-
-			default:
-				priority = 110
-		}
-		prioritisedTags.push({ ...tag, priority })
-	})
-
-	return prioritisedTags
 }
 
-function applyDefaultTags(tags: PrioritisedTag[]): PrioritisedTag[] {
+function getDefaultTags(tags: Tag[]): Tag[] {
+	const defaultTags: Tag[] = []
 	if (!tags.some((tag) => tag.tagName === 'meta' && tag.charset))
-		tags.push({ ...DEFAULT_CHARSET, tagName: 'meta', priority: -4 })
+		defaultTags.push({ ...DEFAULT_CHARSET, tagName: 'meta' })
 
 	if (!tags.some((tag) => tag.tagName === 'meta' && tag.name === 'viewport'))
-		tags.push({ ...DEFAULT_VIEWPORT, tagName: 'meta', priority: -3 })
+		defaultTags.push({ ...DEFAULT_VIEWPORT, tagName: 'meta' })
 
-	return tags
+	return defaultTags
+}
+
+function applyPriority(tag: Tag): Required<Tag> {
+	if (typeof tag.priority === 'number') return tag as Required<Tag>
+	let priority: number
+	switch (tag.tagName) {
+		case 'title':
+			priority = 0
+			break
+
+		case 'base':
+			priority = -2
+			break
+
+		case 'meta':
+			if (tag.charset) priority = -4
+			else if (tag.name === 'viewport') priority = -3
+			else if (tag['http-equiv']) priority = -1
+			else priority = 100
+			break
+
+		case 'link':
+			if (tag.rel === 'preconnect') priority = 10
+			else if (tag.rel === 'preload') priority = 60
+			else if (tag.rel === 'prefetch') priority = 80
+			else if (tag.rel === 'stylesheet') priority = 50
+			else priority = 90
+			break
+
+		case 'style':
+			priority = tag.innerHTML.includes('@import') ? 30 : 51
+			break
+
+		case 'script':
+			if (tag.async) priority = 20
+			else if (tag.defer) priority = 70
+			else priority = 40
+			break
+
+		default:
+			priority = 110
+	}
+	return { ...tag, priority }
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
