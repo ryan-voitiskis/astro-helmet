@@ -5,8 +5,11 @@
 	"description": "A document head manager for astro.",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"files": [
+		"dist/**/*"
+	],
 	"scripts": {
-		"build": "tsc",
+		"build": "tsc && cp src/*.astro dist/",
 		"test": "vitest",
 		"coverage": "vitest run --coverage"
 	},

@@ -1,0 +1,25 @@
+---
+import { type HeadItems, type Tag, renderHead } from '.'
+
+interface Props {
+	headItems: HeadItems | HeadItems[]
+	options: {
+		omitHeadTags?: boolean
+		applyPriority?: (tag: Tag) => Required<Tag>
+	}
+}
+
+const { headItems, options } = Astro.props
+const { applyPriority, omitHeadTags = false } = options
+const head = renderHead(headItems, applyPriority)
+---
+
+{
+	omitHeadTags ? (
+		<Fragment set:html={head} />
+	) : (
+		<head>
+			<Fragment set:html={head} />
+		</head>
+	)
+}

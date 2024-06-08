@@ -22,7 +22,7 @@ type ContentItem = BaseItem & {
 	innerHTML?: string
 }
 
-type Tag = (BaseItem | ContentItem) & {
+export type Tag = (BaseItem | ContentItem) & {
 	tagName: TagName
 	priority?: number
 }
@@ -37,7 +37,10 @@ export type HeadItems = {
 	noscript?: ContentItem[]
 }
 
-export function renderHead(headItems: HeadItems | HeadItems[]): string {
+export function renderHead(
+	headItems: HeadItems | HeadItems[],
+	applyPriority?: (tag: Tag) => Required<Tag>
+): string {
 	const items = Array.isArray(headItems)
 		? mergeHeadItems(headItems.map((i) => normaliseHeadItems(i)))
 		: normaliseHeadItems(headItems)
@@ -54,7 +57,9 @@ export function renderHead(headItems: HeadItems | HeadItems[]): string {
 	tags.push({ tagName: 'title', innerHTML: items.title })
 	tags.push(...getDefaultTags(tags))
 
-	const prioritisedTags = tags.map((tag) => applyPriority(tag)) // TODO: use applyPriority from options if provided
+	const prioritisedTags = tags.map((tag) =>
+		applyPriority ? applyPriority(tag) : applyPriorityDefault(tag)
+	)
 
 	const orderedTags = prioritisedTags.sort((a, b) => a.priority - b.priority)
 
@@ -97,7 +102,7 @@ function getDefaultTags(tags: Tag[]): Tag[] {
 	return defaultTags
 }
 
-function applyPriority(tag: Tag): Required<Tag> {
+function applyPriorityDefault(tag: Tag): Required<Tag> {
 	if (typeof tag.priority === 'number') return tag as Required<Tag>
 	let priority: number
 	switch (tag.tagName) {
