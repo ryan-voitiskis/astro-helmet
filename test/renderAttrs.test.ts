@@ -1,4 +1,4 @@
-import { renderAttrs } from './index'
+import { renderAttrs } from '../src/main'
 import { describe, it, expect } from 'vitest'
 
 const testCases = [

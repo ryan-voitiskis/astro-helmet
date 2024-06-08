@@ -1,34 +1,39 @@
 {
 	"name": "astro-helmet",
-	"type": "module",
 	"version": "1.0.0-alpha.0",
+	"type": "module",
 	"description": "A document head manager for astro.",
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
-	"files": [
-		"dist/**/*"
-	],
-	"scripts": {
-		"build": "tsc && cp src/*.astro dist/",
-		"test": "vitest",
-		"coverage": "vitest run --coverage"
+	"author": "Ryan Voitiskis",
+	"license": "ISC",
+	"exports": {
+		".": "./index.ts"
 	},
+	"files": [
+		"src",
+		"index.ts"
+	],
 	"keywords": [
 		"astro",
+		"astro-component",
 		"head",
 		"seo",
 		"meta-tags",
 		"html-head",
 		"helmet",
-		"document-head",
-		"web-development"
+		"document-head"
 	],
-	"author": "Ryan Voitiskis",
-	"license": "ISC",
+	"scripts": {
+		"test": "vitest",
+		"coverage": "vitest run --coverage"
+	},
 	"devDependencies": {
 		"@vitest/coverage-v8": "^1.6.0",
 		"prettier": "^3.3.0",
 		"typescript": "^5.4.5",
-		"vitest": "^1.6.0"
+		"vitest": "^1.6.0",
+		"astro": "^4.10.0"
+	},
+	"peerDependencies": {
+		"astro": "^4.0.0"
 	}
 }

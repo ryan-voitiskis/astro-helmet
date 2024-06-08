@@ -1,4 +1,4 @@
-import { renderHead, type HeadItems } from './index'
+import { renderHead, type HeadItems } from '../src/main'
 import { describe, it, expect } from 'vitest'
 
 type TestCase = {
