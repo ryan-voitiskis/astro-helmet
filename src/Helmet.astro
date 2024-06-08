@@ -9,7 +9,7 @@ interface Props {
 	}
 }
 
-const { headItems, options } = Astro.props
+const { headItems, options = {} } = Astro.props
 const { applyPriority, omitHeadTags = false } = options
 const head = renderHead(headItems, applyPriority)
 ---
