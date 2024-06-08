@@ -1,9 +1,9 @@
 {
 	"name": "astro-helmet",
-	"version": "1.0.0-alpha.2",
+	"version": "1.0.0",
 	"type": "module",
 	"description": "A document head manager for astro.",
-	"author": "Ryan Voitiskis",
+	"author": "Ryan Voitiskis <ryanvoitiskis@pm.me> (https://ryanvoitiskis.com/)",
 	"license": "ISC",
 	"exports": {
 		".": "./index.ts"
@@ -36,5 +36,13 @@
 	},
 	"peerDependencies": {
 		"astro": "^4.0.0"
-	}
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ryan-voitiskis/astro-helmet.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ryan-voitiskis/astro-helmet/issues"
+	},
+	"homepage": "https://github.com/ryan-voitiskis/astro-helmet#readme"
 }
