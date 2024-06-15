@@ -17,7 +17,7 @@
 Install `astro-helmet` using npm:
 
 ```bash
-npm install astro-helmet
+npm i astro-helmet
 ```
 
 ## Usage
@@ -29,23 +29,23 @@ In your Layout component, import `astro-helmet` and pass an object of `headItems
 import Helmet from 'astro-helmet'
 
 const headItems = {
-	title: 'My Site Title',
-	base: [{ href: 'https://example.com' }],
-	meta: [
-		{ name: 'description', content: 'My site description' },
-		{ property: 'og:type', content: 'website' }
-	],
-	link: [{ rel: 'stylesheet', href: 'styles.css' }],
-	style: [{ innerHTML: 'body { color: red; }' }],
-	script: [{ innerHTML: 'console.log("Hello, world!")' }],
-	noscript: [{ innerHTML: 'Please enable JavaScript' }]
+  title: 'My Site Title',
+  base: [{ href: 'https://example.com' }],
+  meta: [
+    { name: 'description', content: 'My site description' },
+    { property: 'og:type', content: 'website' }
+  ],
+  link: [{ rel: 'stylesheet', href: 'styles.css' }],
+  style: [{ innerHTML: 'body { color: red; }' }],
+  script: [{ innerHTML: 'console.log("Hello, world!")' }],
+  noscript: [{ innerHTML: 'Please enable JavaScript' }]
 }
 ---
 
 <!doctype html>
 <html lang="en">
-	<Helmet {headItems} />
-	<body></body>
+  <Helmet {headItems} />
+  <body> ... </body>
 </html>
 ```
 
@@ -59,8 +59,8 @@ To control the order of head items, use the `priority` key.
 
 ```ts
 const headItems: HeadItems = {
-	// priority 1 will move the script to just below the <title>
-	script: [{ src: '/scripts/importantScript.js', defer: true, priority: 1 }]
+  // priority 1 will move the script to just below the <title>
+  script: [{ src: '/scripts/importantScript.js', priority: 1 }]
 }
 ```
 
@@ -74,15 +74,15 @@ import Helmet from 'astro-helmet'
 import type { HeadItems } from 'astro-helmet'
 
 interface Props {
-	headItems: HeadItems
+  headItems: HeadItems
 }
 
 const layoutHeadItems: HeadItems = {
-	link: [
-		{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-		{ rel: 'sitemap', href: '/sitemap-index.xml' }
-	],
-	meta: [{ property: 'og:type', content: 'website' }]
+  link: [
+    { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+    { rel: 'sitemap', href: '/sitemap-index.xml' }
+  ],
+  meta: [{ property: 'og:type', content: 'website' }]
 }
 
 const { headItems: pageHeadItems } = Astro.props
@@ -90,8 +90,8 @@ const { headItems: pageHeadItems } = Astro.props
 
 <!doctype html>
 <html lang="en">
-	<Helmet headItems={[layoutHeadItems, pageHeadItems]} />
-	<body></body>
+  <Helmet headItems={[layoutHeadItems, pageHeadItems]} />
+  <body> ... </body>
 </html>
 ```
 
@@ -102,14 +102,14 @@ Then in your page components (or elsewhere), you can define additional head item
 import type { HeadItems } from 'astro-helmet'
 
 const headItems: HeadItems = {
-	title: 'My Site Title',
-	meta: [{ name: 'description', content: 'My site description' }],
-	link: [{ rel: 'canonical', href: 'https://example.com' }]
+  title: 'My Site Title',
+  meta: [{ name: 'description', content: 'My site description' }],
+  link: [{ rel: 'canonical', href: 'https://example.com' }]
 }
 ---
 
 <Layout {headItems}>
-	<main>content</main>
+  <main>content</main>
 </Layout>
 ```
 
@@ -128,11 +128,11 @@ The `Helmet` component takes two props:
 
 ```ts
 interface Props {
-	headItems: HeadItems | HeadItems[]
-	options?: {
-		omitHeadTags?: boolean
-		applyPriority?: (tag: Tag) => Required<Tag>
-	}
+  headItems: HeadItems | HeadItems[]
+  options?: {
+    omitHeadTags?: boolean
+    applyPriority?: (tag: Tag) => Required<Tag>
+  }
 }
 ```
 
@@ -152,10 +152,10 @@ const options = { omitHeadTags: true }
 
 <!doctype html>
 <html lang="en">
-	<head>
-		<Helmet {headItems} {options} />
-	</head>
-	<body></body>
+  <head>
+    <Helmet {headItems} {options} />
+  </head>
+  <body> ... </body>
 </html>
 ```
 
@@ -188,46 +188,46 @@ This is the default implementation of `applyPriority()`:
 
 ```ts
 function applyPriority(tag: Tag): Required<Tag> {
-	if (typeof tag.priority === 'number') return tag as Required<Tag>
-	let priority: number
-	switch (tag.tagName) {
-		case 'title':
-			priority = 0
-			break
+  if (typeof tag.priority === 'number') return tag as Required<Tag>
+  let priority: number
+  switch (tag.tagName) {
+    case 'title':
+      priority = 0
+      break
 
-		case 'base':
-			priority = -2
-			break
+    case 'base':
+      priority = -2
+      break
 
-		case 'meta':
-			if (tag.charset) priority = -4
-			else if (tag.name === 'viewport') priority = -3
-			else if (tag['http-equiv']) priority = -1
-			else priority = 100
-			break
+    case 'meta':
+      if (tag.charset) priority = -4
+      else if (tag.name === 'viewport') priority = -3
+      else if (tag['http-equiv']) priority = -1
+      else priority = 100
+      break
 
-		case 'link':
-			if (tag.rel === 'preconnect') priority = 10
-			else if (tag.rel === 'preload') priority = 60
-			else if (tag.rel === 'prefetch') priority = 80
-			else if (tag.rel === 'stylesheet') priority = 50
-			else priority = 90
-			break
+    case 'link':
+      if (tag.rel === 'preconnect') priority = 10
+      else if (tag.rel === 'preload') priority = 60
+      else if (tag.rel === 'prefetch') priority = 80
+      else if (tag.rel === 'stylesheet') priority = 50
+      else priority = 90
+      break
 
-		case 'style':
-			priority = tag.innerHTML.includes('@import') ? 30 : 51
-			break
+    case 'style':
+      priority = tag.innerHTML.includes('@import') ? 30 : 51
+      break
 
-		case 'script':
-			if (tag.async) priority = 20
-			else if (tag.defer) priority = 70
-			else priority = 40
-			break
+    case 'script':
+      if (tag.async) priority = 20
+      else if (tag.defer) priority = 70
+      else priority = 40
+      break
 
-		default:
-			priority = 110
-	}
-	return { ...tag, priority }
+    default:
+      priority = 110
+  }
+  return { ...tag, priority }
 }
 ```
 
@@ -240,8 +240,8 @@ Default charset and viewport meta tags are included by default.
 ```ts
 const DEFAULT_CHARSET = { charset: 'UTF-8' }
 const DEFAULT_VIEWPORT = {
-	name: 'viewport',
-	content: 'width=device-width, initial-scale=1'
+  name: 'viewport',
+  content: 'width=device-width, initial-scale=1'
 }
 ```
 

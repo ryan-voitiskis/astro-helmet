@@ -13,6 +13,14 @@ export default {
 				parser: 'astro',
 				astroAllowShorthand: true
 			}
+		},
+		{
+			files: 'README.md',
+			options: {
+				// tabs are 8 spaces on GitHub, this give us a sensible indent on README
+				useTabs: false,
+				tabWidth: 2
+			}
 		}
 	]
 }
