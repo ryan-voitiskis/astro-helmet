@@ -2,6 +2,17 @@ import { renderAttrs } from '../src/main'
 import { describe, it, expect } from 'vitest'
 
 describe('renderAttrs', () => {
+	it('Filters priority, tagName and innerHTML attributes', () => {
+		const attributes = {
+			priority: 3,
+			tagName: 'div',
+			innerHTML: 'Hello, world!',
+			id: 'main'
+		}
+		const expected = 'id="main"'
+		expect(renderAttrs(attributes)).toEqual(expected)
+	})
+
 	it('Preload a font with standard attributes', () => {
 		const attributes = {
 			rel: 'preload',
