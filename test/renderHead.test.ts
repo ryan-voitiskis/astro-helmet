@@ -295,4 +295,28 @@ describe('renderHead', () => {
 		const params = {}
 		expect(() => renderHead(params)).toThrowError('Missing title tag')
 	})
+
+	it('Does not deduplicate meta tags with same name but different media attributes', () => {
+		const params = {
+			title: 'My Site Title',
+			meta: [
+				{
+					name: 'theme-color',
+					media: '(prefers-color-scheme: light)',
+					content: 'cyan'
+				},
+				{
+					name: 'theme-color',
+					media: '(prefers-color-scheme: dark)',
+					content: 'black'
+				}
+			]
+		}
+		const expected = `<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Site Title</title>
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="cyan">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="black">`
+		expect(renderHead(params)).toEqual(expected)
+	})
 })

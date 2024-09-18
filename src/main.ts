@@ -146,14 +146,31 @@ function applyPriorityDefault(tag: Tag): Required<Tag> {
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
-	const metaMap = new Map<string, BaseItem>()
+	const metaMap = groupMetaItemsByKey(metaItems)
+	return Array.from(metaMap.values()).flatMap(deduplicateByMedia)
+}
+
+function groupMetaItemsByKey(metaItems: BaseItem[]): Map<string, BaseItem[]> {
+	const metaMap = new Map<string, BaseItem[]>()
 
 	metaItems.forEach((meta) => {
 		const key = meta.property || meta.name || meta['http-equiv']
-		if (key) metaMap.set(key, meta)
+		if (key) metaMap.set(key, (metaMap.get(key) || []).concat(meta))
 	})
 
-	return Array.from(metaMap.values())
+	return metaMap
+}
+
+function deduplicateByMedia(items: BaseItem[]): BaseItem[] {
+	if (items.length === 1) return items
+
+	const uniqueItems = new Map<string, BaseItem>()
+	items.forEach((item) => {
+		const mediaKey = item.media || ''
+		uniqueItems.set(mediaKey, item)
+	})
+
+	return Array.from(uniqueItems.values())
 }
 
 function renderHeadTag(item: BaseItem | ContentItem): string {
