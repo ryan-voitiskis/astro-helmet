@@ -1,6 +1,6 @@
 {
 	"name": "astro-helmet",
-	"version": "1.0.3",
+	"version": "1.0.5",
 	"type": "module",
 	"description": "A document head manager for astro.",
 	"author": "Ryan Voitiskis <ryanvoitiskis@pm.me> (https://ryanvoitiskis.com/)",
