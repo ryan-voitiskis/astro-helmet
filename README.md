@@ -51,7 +51,7 @@ const headItems = {
 
 Any attribute can be added to a head item. Simply provide the attribute as a key-value pair in the object.
 
-`'innerHTML', 'priority', 'tagName'` are reserved keys and cannot not be used as attributes.
+`'innerHTML', 'priority', 'tagName'` are reserved keys and cannot be used as attributes.
 
 To add content to a tag, use the `innerHTML` key. This will render the content inside the tag.
 
