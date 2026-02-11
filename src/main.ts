@@ -14,6 +14,7 @@ type TagName =
 	| 'noscript'
 
 type BaseItem = {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[key: string]: any
 	priority?: number
 }
@@ -50,7 +51,7 @@ export function renderHead(
 	items.meta = deduplicateMetaItems(items.meta)
 	items.base = items.base.slice(-1)
 
-	const { title, ...rest } = items
+	const { title: _title, ...rest } = items
 	const tags: Tag[] = Object.entries(rest).flatMap(([tagName, tagItems]) =>
 		tagItems.map((item) => ({ ...item, tagName }) as Tag)
 	)
