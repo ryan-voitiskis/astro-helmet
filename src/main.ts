@@ -28,6 +28,12 @@ export type Tag = (BaseItem | ContentItem) & {
 	priority?: number
 }
 
+export type JsonLdItem = {
+	'@type': string
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	[key: string]: any
+}
+
 export type HeadItems = {
 	title?: string
 	base?: BaseItem[]
@@ -36,6 +42,18 @@ export type HeadItems = {
 	style?: ContentItem[]
 	script?: ContentItem[]
 	noscript?: ContentItem[]
+	jsonLd?: JsonLdItem | JsonLdItem[]
+}
+
+type NormalisedHeadItems = {
+	title: string
+	base: BaseItem[]
+	meta: BaseItem[]
+	link: BaseItem[]
+	style: ContentItem[]
+	script: ContentItem[]
+	noscript: ContentItem[]
+	jsonLd: JsonLdItem[]
 }
 
 export function renderHead(
@@ -51,12 +69,22 @@ export function renderHead(
 	items.meta = deduplicateMetaItems(items.meta)
 	items.base = items.base.slice(-1)
 
-	const { title: _title, ...rest } = items
+	const { title: _title, jsonLd: _jsonLd, ...rest } = items
 	const tags: Tag[] = Object.entries(rest).flatMap(([tagName, tagItems]) =>
 		tagItems.map((item) => ({ ...item, tagName }) as Tag)
 	)
 	tags.push({ tagName: 'title', innerHTML: items.title })
 	tags.push(...getDefaultTags(tags))
+
+	for (const item of items.jsonLd) {
+		tags.push({
+			tagName: 'script',
+			type: 'application/ld+json',
+			innerHTML: escapeJsonLd(
+				JSON.stringify({ '@context': 'https://schema.org', ...item })
+			)
+		})
+	}
 
 	const prioritisedTags = tags.map((tag) =>
 		applyPriority ? applyPriority(tag) : applyPriorityDefault(tag)
@@ -67,7 +95,7 @@ export function renderHead(
 	return orderedTags.map((i) => renderHeadTag(i)).join('\n')
 }
 
-function normaliseHeadItems(items: HeadItems): Required<HeadItems> {
+function normaliseHeadItems(items: HeadItems): NormalisedHeadItems {
 	return {
 		title: items.title || '',
 		base: items.base || [],
@@ -75,11 +103,16 @@ function normaliseHeadItems(items: HeadItems): Required<HeadItems> {
 		link: items.link || [],
 		style: items.style || [],
 		script: items.script || [],
-		noscript: items.noscript || []
+		noscript: items.noscript || [],
+		jsonLd: Array.isArray(items.jsonLd)
+			? items.jsonLd
+			: items.jsonLd
+				? [items.jsonLd]
+				: []
 	}
 }
 
-function mergeHeadItems(items: Required<HeadItems>[]): Required<HeadItems> {
+function mergeHeadItems(items: NormalisedHeadItems[]): NormalisedHeadItems {
 	return items.reduce((merged, item) => {
 		merged.title = item.title || merged.title
 		merged.base.push(...item.base)
@@ -88,6 +121,7 @@ function mergeHeadItems(items: Required<HeadItems>[]): Required<HeadItems> {
 		merged.style.push(...item.style)
 		merged.script.push(...item.script)
 		merged.noscript.push(...item.noscript)
+		merged.jsonLd.push(...item.jsonLd)
 		return merged
 	})
 }
@@ -135,7 +169,8 @@ function applyPriorityDefault(tag: Tag): Required<Tag> {
 			break
 
 		case 'script':
-			if (tag.async) priority = 20
+			if (tag.type === 'application/ld+json') priority = 105
+			else if (tag.async) priority = 20
 			else if (tag.defer) priority = 70
 			else priority = 40
 			break
@@ -144,6 +179,10 @@ function applyPriorityDefault(tag: Tag): Required<Tag> {
 			priority = 110
 	}
 	return { ...tag, priority }
+}
+
+function escapeJsonLd(json: string): string {
+	return json.replace(/<\//g, '<\\/')
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {

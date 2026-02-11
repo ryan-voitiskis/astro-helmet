@@ -1,4 +1,4 @@
-import { renderHead, type Tag } from '../src/main'
+import { renderHead, type Tag, type HeadItems } from '../src/main'
 import { describe, it, expect } from 'vitest'
 
 describe('renderHead', () => {
@@ -318,5 +318,142 @@ describe('renderHead', () => {
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="cyan">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="black">`
 		expect(renderHead(params)).toEqual(expected)
+	})
+})
+
+describe('JSON-LD', () => {
+	it('Single JSON-LD block renders correctly with @context injected', () => {
+		const params: HeadItems = {
+			title: 'My Article',
+			jsonLd: {
+				'@type': 'Article',
+				headline: 'My Article'
+			}
+		}
+		const expected = `<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Article</title>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"My Article"}</script>`
+		expect(renderHead(params)).toEqual(expected)
+	})
+
+	it('Multiple JSON-LD blocks render as separate script tags', () => {
+		const params: HeadItems = {
+			title: 'My Article',
+			jsonLd: [
+				{ '@type': 'Article', headline: 'My Article' },
+				{
+					'@type': 'BreadcrumbList',
+					itemListElement: [
+						{ '@type': 'ListItem', position: 1, name: 'Home' }
+					]
+				}
+			]
+		}
+		const result = renderHead(params)
+		const jsonLdTags = result
+			.split('\n')
+			.filter((line) => line.includes('application/ld+json'))
+		expect(jsonLdTags).toHaveLength(2)
+		expect(jsonLdTags[0]).toContain('"@type":"Article"')
+		expect(jsonLdTags[1]).toContain('"@type":"BreadcrumbList"')
+	})
+
+	it('Value containing </script> is escaped to <\\/script>', () => {
+		const params: HeadItems = {
+			title: 'My Article',
+			jsonLd: {
+				'@type': 'Article',
+				headline: 'Test </script><script>alert("xss")</script>'
+			}
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('</script><script>')
+		expect(result).toContain('<\\/script>')
+	})
+
+	it('Array merge from HeadItems[] concatenates JSON-LD blocks', () => {
+		const params: HeadItems[] = [
+			{
+				title: 'My Article',
+				jsonLd: { '@type': 'WebSite', name: 'My Blog' }
+			},
+			{
+				jsonLd: { '@type': 'Article', headline: 'My Article' }
+			}
+		]
+		const result = renderHead(params)
+		const jsonLdTags = result
+			.split('\n')
+			.filter((line) => line.includes('application/ld+json'))
+		expect(jsonLdTags).toHaveLength(2)
+		expect(jsonLdTags[0]).toContain('"@type":"WebSite"')
+		expect(jsonLdTags[1]).toContain('"@type":"Article"')
+	})
+
+	it('JSON-LD sorts after regular meta (100) and before noscript (110)', () => {
+		const params: HeadItems = {
+			title: 'My Article',
+			meta: [{ name: 'description', content: 'A description' }],
+			noscript: [{ innerHTML: 'Please enable JavaScript' }],
+			jsonLd: { '@type': 'Article', headline: 'My Article' }
+		}
+		const result = renderHead(params)
+		const lines = result.split('\n')
+		const metaDescIdx = lines.findIndex((l) =>
+			l.includes('name="description"')
+		)
+		const jsonLdIdx = lines.findIndex((l) =>
+			l.includes('application/ld+json')
+		)
+		const noscriptIdx = lines.findIndex((l) => l.includes('<noscript>'))
+		expect(metaDescIdx).toBeLessThan(jsonLdIdx)
+		expect(jsonLdIdx).toBeLessThan(noscriptIdx)
+	})
+
+	it('Works with custom applyPriority function', () => {
+		const params: HeadItems = {
+			title: 'My Article',
+			jsonLd: { '@type': 'Article', headline: 'My Article' }
+		}
+		function applyPriority(tag: Tag): Required<Tag> {
+			if (typeof tag.priority === 'number') return tag as Required<Tag>
+			let priority: number
+			if (tag.type === 'application/ld+json') priority = -10
+			else if (tag.tagName === 'title') priority = 0
+			else priority = 1
+			return { ...tag, priority }
+		}
+		const result = renderHead(params, applyPriority)
+		const lines = result.split('\n')
+		expect(lines[0]).toContain('application/ld+json')
+	})
+
+	it('Renders correctly alongside other head elements', () => {
+		const params: HeadItems = {
+			title: 'My Article',
+			meta: [{ name: 'description', content: 'A description' }],
+			link: [{ rel: 'stylesheet', href: 'styles.css' }],
+			script: [{ innerHTML: 'console.log("hi")' }],
+			noscript: [{ innerHTML: 'Enable JS' }],
+			jsonLd: { '@type': 'Article', headline: 'My Article' }
+		}
+		const result = renderHead(params)
+		expect(result).toContain('<title>My Article</title>')
+		expect(result).toContain('name="description"')
+		expect(result).toContain('rel="stylesheet"')
+		expect(result).toContain('console.log("hi")')
+		expect(result).toContain('<noscript>Enable JS</noscript>')
+		expect(result).toContain('application/ld+json')
+		expect(result).toContain('"@context":"https://schema.org"')
+	})
+
+	it('No extra script tags when jsonLd is not provided', () => {
+		const params: HeadItems = {
+			title: 'My Site Title'
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('application/ld+json')
+		expect(result).not.toContain('@context')
 	})
 })
