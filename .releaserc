@@ -1,6 +1,6 @@
 {
 	"branches": [
-		"master"
+		"main"
 	],
 	"repositoryUrl": "https://github.com/ryan-voitiskis/astro-helmet.git",
 	"plugins": [
