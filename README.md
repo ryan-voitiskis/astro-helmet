@@ -171,8 +171,8 @@ JSON-LD script tags are rendered with priority `105`, placing them after regular
 
 When provided with an array of `headItems`, `astro-helmet` will merge the items together.
 
-`headItems.meta` are deduplicated by `name`, `property` and `http-equiv`.
-Meta items later in the array replace earlier items.
+`headItems.meta` are deduplicated by `name`, `property`, `http-equiv` and `charset`.
+Meta items later in the array replace earlier items. Meta tags without any of these keys (e.g. `itemprop`-only tags) are never deduplicated.
 
 `title` and `base` items are also deduplicated, with the last item in the array taking precedence.
 
@@ -270,7 +270,7 @@ function applyPriority(tag: Tag): Required<Tag> {
       break
 
     case 'style':
-      priority = tag.innerHTML.includes('@import') ? 30 : 51
+      priority = tag.innerHTML?.includes('@import') ? 30 : 51
       break
 
     case 'script':
