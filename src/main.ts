@@ -167,7 +167,7 @@ function applyPriorityDefault(tag: Tag): Required<Tag> {
 			break
 
 		case 'style':
-			priority = tag.innerHTML.includes('@import') ? 30 : 51
+			priority = tag.innerHTML?.includes('@import') ? 30 : 51
 			break
 
 		case 'script':
