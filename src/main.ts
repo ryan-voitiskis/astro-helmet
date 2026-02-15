@@ -125,7 +125,7 @@ function mergeHeadItems(items: NormalisedHeadItems[]): NormalisedHeadItems {
 		merged.noscript.push(...item.noscript)
 		merged.jsonLd.push(...item.jsonLd)
 		return merged
-	})
+	}, normaliseHeadItems({}))
 }
 
 function getDefaultTags(tags: Tag[]): Tag[] {
