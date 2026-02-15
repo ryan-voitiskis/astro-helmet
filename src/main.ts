@@ -192,7 +192,7 @@ function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
 	const metaMap = new Map<string, BaseItem[]>()
 
 	for (const meta of metaItems) {
-		const key = meta.property || meta.name || meta['http-equiv']
+		const key = meta.property || meta.name || meta['http-equiv'] || (meta.charset ? 'charset' : null)
 		if (key) metaMap.set(key, (metaMap.get(key) || []).concat(meta))
 		else keyless.push(meta)
 	}

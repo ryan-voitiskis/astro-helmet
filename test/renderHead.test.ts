@@ -336,6 +336,66 @@ describe('renderHead', () => {
 		expect(result).toContain('<style media="print"></style>')
 	})
 
+	it('Deduplicates base tags, keeping the last', () => {
+		const params = {
+			title: 'T',
+			base: [{ href: 'https://first.com' }, { href: 'https://last.com' }]
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('first.com')
+		expect(result).toContain('<base href="https://last.com">')
+	})
+
+	it('Deduplicates charset meta tags, keeping the last', () => {
+		const params = [
+			{ title: 'T', meta: [{ charset: 'UTF-8' }] },
+			{ meta: [{ charset: 'UTF-16' }] }
+		]
+		const result = renderHead(params)
+		expect(result).toContain('charset="UTF-16"')
+		expect(result).not.toMatch(/charset="UTF-8"/)
+	})
+
+	it('Deduplicates same-media meta tags via last-write-wins', () => {
+		const params = {
+			title: 'T',
+			meta: [
+				{
+					name: 'theme-color',
+					media: '(prefers-color-scheme: light)',
+					content: 'white'
+				},
+				{
+					name: 'theme-color',
+					media: '(prefers-color-scheme: dark)',
+					content: 'black'
+				},
+				{
+					name: 'theme-color',
+					media: '(prefers-color-scheme: light)',
+					content: 'cyan'
+				}
+			]
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('content="white"')
+		expect(result).toContain('content="cyan"')
+		expect(result).toContain('content="black"')
+	})
+
+	it('Preserves multiple keyless metas with same value', () => {
+		const params = {
+			title: 'T',
+			meta: [
+				{ itemprop: 'name', content: 'Same' },
+				{ itemprop: 'name', content: 'Same' }
+			]
+		}
+		const result = renderHead(params)
+		const matches = result.match(/itemprop="name"/g)
+		expect(matches).toHaveLength(2)
+	})
+
 	it('Does not deduplicate meta tags with same name but different media attributes', () => {
 		const params = {
 			title: 'My Site Title',
@@ -520,6 +580,7 @@ describe('JSON-LD', () => {
 		}
 		const result = renderHead(params)
 		expect(result).not.toContain('</script><script>')
+		expect(result).toContain('<\\/script>')
 	})
 
 	it('No extra script tags when jsonLd is not provided', () => {

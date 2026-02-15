@@ -124,6 +124,16 @@ describe('renderAttrs', () => {
 		expect(renderAttrs(attributes)).toEqual(expected)
 	})
 
+	it('Ampersand in attribute value is escaped', () => {
+		const attributes = { content: 'a&b' }
+		expect(renderAttrs(attributes)).toEqual('content="a&amp;b"')
+	})
+
+	it('Angle brackets in attribute value are escaped', () => {
+		const attributes = { content: 'a<b>c' }
+		expect(renderAttrs(attributes)).toEqual('content="a&lt;b&gt;c"')
+	})
+
 	it('No attributes', () => {
 		const attributes = {}
 		const expected = ''
