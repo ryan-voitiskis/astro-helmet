@@ -330,6 +330,12 @@ describe('renderHead', () => {
 		expect(result).not.toContain('<base >')
 	})
 
+	it('Style tag without innerHTML does not crash and renders correctly', () => {
+		const params = { title: 'T', style: [{ media: 'print' }] }
+		const result = renderHead(params)
+		expect(result).toContain('<style media="print"></style>')
+	})
+
 	it('Does not deduplicate meta tags with same name but different media attributes', () => {
 		const params = {
 			title: 'My Site Title',
