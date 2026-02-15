@@ -10,6 +10,7 @@
 - Include default charset and viewport meta tags.
 - Order head items with default or specified priority.
 - Meta tag deduplication.
+- JSON-LD structured data helper with automatic `@context`, serialization, and escaping.
 - Flexible API for adding head items and tag attributes.
 
 ## Installation
@@ -113,6 +114,59 @@ const headItems: HeadItems = {
 </Layout>
 ```
 
+### JSON-LD / Structured Data
+
+Use the `jsonLd` property to add [JSON-LD structured data](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data) to your pages. `@context` is set to `https://schema.org` automatically, `JSON.stringify()` is handled internally, and `</script>` sequences in values are escaped.
+
+```ts
+const headItems: HeadItems = {
+  title: 'My Article',
+  jsonLd: {
+    '@type': 'Article',
+    headline: 'My Article',
+    author: { '@type': 'Person', name: 'Ryan' },
+    datePublished: '2025-12-01'
+  }
+}
+```
+
+Multiple JSON-LD blocks are supported — pass an array:
+
+```ts
+const headItems: HeadItems = {
+  title: 'My Article',
+  jsonLd: [
+    { '@type': 'Article', headline: 'My Article' },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://example.com/' },
+        { '@type': 'ListItem', position: 2, name: 'My Article' }
+      ]
+    }
+  ]
+}
+```
+
+JSON-LD composes naturally with layout + page merging. Each source contributes blocks that render as separate `<script type="application/ld+json">` tags:
+
+```ts
+// Layout
+const layoutHead: HeadItems = {
+  jsonLd: { '@type': 'WebSite', name: 'My Blog', url: 'https://example.com' }
+}
+
+// Page
+const pageHead: HeadItems = {
+  title: 'My Article',
+  jsonLd: { '@type': 'Article', headline: 'My Article' }
+}
+
+// <Helmet headItems={[layoutHead, pageHead]} />
+```
+
+JSON-LD script tags are rendered with priority `105`, placing them after regular meta tags and before noscript elements.
+
 ### Deduplication
 
 When provided with an array of `headItems`, `astro-helmet` will merge the items together.
@@ -182,6 +236,7 @@ By default, items are ordered as follows:
 | 80       | `<link rel="prefetch" />`                     |
 | 90       | remaining `<link>`                            |
 | 100      | remaining `<meta>`                            |
+| 105      | `<script type="application/ld+json">`         |
 | 110      | anything else                                 |
 
 This is the default implementation of `applyPriority()`:
@@ -219,7 +274,8 @@ function applyPriority(tag: Tag): Required<Tag> {
       break
 
     case 'script':
-      if (tag.async) priority = 20
+      if (tag.type === 'application/ld+json') priority = 105
+      else if (tag.async) priority = 20
       else if (tag.defer) priority = 70
       else priority = 40
       break
