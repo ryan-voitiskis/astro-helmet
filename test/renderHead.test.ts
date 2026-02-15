@@ -333,7 +333,7 @@ describe('JSON-LD', () => {
 		const expected = `<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My Article</title>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"My Article"}</script>`
+<script type="application/ld+json">{"@type":"Article","headline":"My Article","@context":"https://schema.org"}</script>`
 		expect(renderHead(params)).toEqual(expected)
 	})
 
@@ -446,6 +446,40 @@ describe('JSON-LD', () => {
 		expect(result).toContain('<noscript>Enable JS</noscript>')
 		expect(result).toContain('application/ld+json')
 		expect(result).toContain('"@context":"https://schema.org"')
+	})
+
+	it('Empty jsonLd array renders no script tags', () => {
+		const params: HeadItems = { title: 'Test', jsonLd: [] }
+		const result = renderHead(params)
+		expect(result).not.toContain('application/ld+json')
+	})
+
+	it('@context cannot be overridden by user input', () => {
+		const params = {
+			title: 'Test',
+			jsonLd: {
+				'@type': 'Article',
+				'@context': 'https://evil.com'
+			}
+		} as HeadItems
+		const result = renderHead(params)
+		expect(result).toContain('"@context":"https://schema.org"')
+		expect(result).not.toContain('evil.com')
+	})
+
+	it('Escapes </script> in nested object values', () => {
+		const params: HeadItems = {
+			title: 'Test',
+			jsonLd: {
+				'@type': 'Article',
+				author: {
+					'@type': 'Person',
+					name: '</script><script>alert(1)</script>'
+				}
+			}
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('</script><script>')
 	})
 
 	it('No extra script tags when jsonLd is not provided', () => {

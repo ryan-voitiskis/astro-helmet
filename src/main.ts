@@ -30,6 +30,8 @@ export type Tag = (BaseItem | ContentItem) & {
 
 export type JsonLdItem = {
 	'@type': string
+	/** Automatically injected — do not provide. */
+	'@context'?: never
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[key: string]: any
 }
@@ -81,7 +83,7 @@ export function renderHead(
 			tagName: 'script',
 			type: 'application/ld+json',
 			innerHTML: escapeJsonLd(
-				JSON.stringify({ '@context': 'https://schema.org', ...item })
+				JSON.stringify({ ...item, '@context': 'https://schema.org' })
 			)
 		})
 	}
