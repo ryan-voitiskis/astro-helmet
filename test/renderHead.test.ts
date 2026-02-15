@@ -300,6 +300,29 @@ describe('renderHead', () => {
 		expect(() => renderHead([])).toThrowError('Missing title tag')
 	})
 
+	it('Preserves meta tags with itemprop attribute', () => {
+		const params = {
+			title: 'My Site Title',
+			meta: [{ itemprop: 'name', content: 'My Site' }]
+		}
+		const expected = `<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Site Title</title>
+<meta itemprop="name" content="My Site">`
+		expect(renderHead(params)).toEqual(expected)
+	})
+
+	it('Custom charset meta suppresses the default UTF-8', () => {
+		const params = {
+			title: 'My Site Title',
+			meta: [{ charset: 'UTF-16' }]
+		}
+		const expected = `<meta charset="UTF-16">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Site Title</title>`
+		expect(renderHead(params)).toEqual(expected)
+	})
+
 	it('Does not deduplicate meta tags with same name but different media attributes', () => {
 		const params = {
 			title: 'My Site Title',

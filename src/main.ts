@@ -188,19 +188,19 @@ function escapeJsonLd(json: string): string {
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
-	const metaMap = groupMetaItemsByKey(metaItems)
-	return Array.from(metaMap.values()).flatMap(deduplicateByMedia)
-}
-
-function groupMetaItemsByKey(metaItems: BaseItem[]): Map<string, BaseItem[]> {
+	const keyless: BaseItem[] = []
 	const metaMap = new Map<string, BaseItem[]>()
 
-	metaItems.forEach((meta) => {
+	for (const meta of metaItems) {
 		const key = meta.property || meta.name || meta['http-equiv']
 		if (key) metaMap.set(key, (metaMap.get(key) || []).concat(meta))
-	})
+		else keyless.push(meta)
+	}
 
-	return metaMap
+	return [
+		...keyless,
+		...Array.from(metaMap.values()).flatMap(deduplicateByMedia)
+	]
 }
 
 function deduplicateByMedia(items: BaseItem[]): BaseItem[] {
