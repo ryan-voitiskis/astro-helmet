@@ -323,6 +323,13 @@ describe('renderHead', () => {
 		expect(renderHead(params)).toEqual(expected)
 	})
 
+	it('Void elements with no attributes render without trailing space', () => {
+		const params = { title: 'T', base: [{}] }
+		const result = renderHead(params)
+		expect(result).toContain('<base>')
+		expect(result).not.toContain('<base >')
+	})
+
 	it('Does not deduplicate meta tags with same name but different media attributes', () => {
 		const params = {
 			title: 'My Site Title',

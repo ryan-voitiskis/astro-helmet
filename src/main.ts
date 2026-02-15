@@ -218,7 +218,7 @@ function deduplicateByMedia(items: BaseItem[]): BaseItem[] {
 function renderHeadTag(item: BaseItem | ContentItem): string {
 	const attrs = renderAttrs(item)
 	return ['meta', 'link', 'base'].includes(item.tagName)
-		? `<${item.tagName} ${attrs}>`
+		? `<${item.tagName}${attrs ? ' ' + attrs : ''}>`
 		: `<${item.tagName}${attrs && ' '}${attrs}>${item.innerHTML || ''}</${
 				item.tagName
 			}>`
