@@ -296,6 +296,10 @@ describe('renderHead', () => {
 		expect(() => renderHead(params)).toThrowError('Missing title tag')
 	})
 
+	it('Errors if empty array is passed', () => {
+		expect(() => renderHead([])).toThrowError('Missing title tag')
+	})
+
 	it('Does not deduplicate meta tags with same name but different media attributes', () => {
 		const params = {
 			title: 'My Site Title',
