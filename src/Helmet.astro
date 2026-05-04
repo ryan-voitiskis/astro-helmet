@@ -6,24 +6,29 @@ interface Props {
 	options?: {
 		omitHeadTags?: boolean
 		applyPriority?: (tag: Tag) => Required<Tag>
+		csp?: boolean
 	}
 }
 
 const { headItems, options = {} } = Astro.props
-const { applyPriority, omitHeadTags = false } = options
+const { applyPriority, omitHeadTags = false, csp: cspEnabled = false } = options
 const head = renderHead(headItems, applyPriority)
 
-// Register CSP hashes and resources when running on Astro 6+ with CSP enabled.
-// Cast avoids typecheck failures for downstream consumers on Astro 4/5 where
-// `csp` isn't declared on `AstroGlobal`.
-const csp = (Astro as unknown as {
-	csp?: {
-		insertScriptHash(hash: string): void
-		insertStyleHash(hash: string): void
-		insertScriptResource(url: string): void
-		insertStyleResource(url: string): void
-	}
-}).csp
+// Register CSP hashes and resources when the consumer opts in via `options.csp`
+// AND is running on Astro 6+ with CSP configured. Reading `Astro.csp` warns in
+// production when CSP isn't configured, so the opt-in keeps the component
+// silent for users who don't need CSP integration. Cast avoids typecheck
+// failures for downstream consumers on Astro 4/5.
+const csp = cspEnabled
+	? (Astro as unknown as {
+			csp?: {
+				insertScriptHash(hash: string): void
+				insertStyleHash(hash: string): void
+				insertScriptResource(url: string): void
+				insertStyleResource(url: string): void
+			}
+		}).csp
+	: undefined
 if (csp) {
 	for (const { type, content } of getInlineContent(headItems)) {
 		const hashBuffer = await crypto.subtle.digest(
