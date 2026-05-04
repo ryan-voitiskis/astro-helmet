@@ -183,6 +183,62 @@ function applyPriorityDefault(tag: Tag): Required<Tag> {
 	return { ...tag, priority }
 }
 
+export function getInlineContent(
+	headItems: HeadItems | HeadItems[]
+): { type: 'script' | 'style'; content: string }[] {
+	const items = Array.isArray(headItems)
+		? mergeHeadItems(headItems.map((i) => normaliseHeadItems(i)))
+		: normaliseHeadItems(headItems)
+
+	const result: { type: 'script' | 'style'; content: string }[] = []
+
+	for (const style of items.style) {
+		if (style.innerHTML) result.push({ type: 'style', content: style.innerHTML })
+	}
+
+	for (const script of items.script) {
+		if (script.innerHTML)
+			result.push({ type: 'script', content: script.innerHTML })
+	}
+
+	for (const item of items.jsonLd) {
+		result.push({
+			type: 'script',
+			content: escapeJsonLd(
+				JSON.stringify({ ...item, '@context': 'https://schema.org' })
+			)
+		})
+	}
+
+	return result
+}
+
+export function getExternalResources(
+	headItems: HeadItems | HeadItems[]
+): { type: 'script' | 'style'; url: string }[] {
+	const items = Array.isArray(headItems)
+		? mergeHeadItems(headItems.map((i) => normaliseHeadItems(i)))
+		: normaliseHeadItems(headItems)
+
+	const result: { type: 'script' | 'style'; url: string }[] = []
+
+	for (const script of items.script) {
+		if (script.src) result.push({ type: 'script', url: script.src })
+	}
+
+	for (const link of items.link) {
+		if (link.rel === 'stylesheet' && link.href)
+			result.push({ type: 'style', url: link.href })
+		else if (link.rel === 'preload' && link.href) {
+			if (link.as === 'script') result.push({ type: 'script', url: link.href })
+			else if (link.as === 'style')
+				result.push({ type: 'style', url: link.href })
+		}
+	}
+
+	return result
+}
+
 function escapeJsonLd(json: string): string {
 	return json.replace(/<\//g, '<\\/')
 }

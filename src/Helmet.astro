@@ -1,5 +1,5 @@
 ---
-import { type HeadItems, type Tag, renderHead } from './main'
+import { type HeadItems, type Tag, renderHead, getInlineContent, getExternalResources } from './main'
 
 interface Props {
 	headItems: HeadItems | HeadItems[]
@@ -12,6 +12,34 @@ interface Props {
 const { headItems, options = {} } = Astro.props
 const { applyPriority, omitHeadTags = false } = options
 const head = renderHead(headItems, applyPriority)
+
+// Register CSP hashes and resources when running on Astro 6+ with CSP enabled.
+// Cast avoids typecheck failures for downstream consumers on Astro 4/5 where
+// `csp` isn't declared on `AstroGlobal`.
+const csp = (Astro as unknown as {
+	csp?: {
+		insertScriptHash(hash: string): void
+		insertStyleHash(hash: string): void
+		insertScriptResource(url: string): void
+		insertStyleResource(url: string): void
+	}
+}).csp
+if (csp) {
+	for (const { type, content } of getInlineContent(headItems)) {
+		const hashBuffer = await crypto.subtle.digest(
+			'SHA-256',
+			new TextEncoder().encode(content)
+		)
+		const hash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)))
+		if (type === 'script') csp.insertScriptHash(`sha256-${hash}`)
+		else csp.insertStyleHash(`sha256-${hash}`)
+	}
+
+	for (const { type, url } of getExternalResources(headItems)) {
+		if (type === 'script') csp.insertScriptResource(url)
+		else csp.insertStyleResource(url)
+	}
+}
 ---
 
 {
