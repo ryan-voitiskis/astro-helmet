@@ -50,6 +50,12 @@ describe('Astro 7 build fixture', () => {
 			expect(html).toContain(
 				'<meta name="description" content="Astro 7 fixture page">'
 			)
+			expect(html).toContain(
+				'<meta property="og:url" content="https://example.com/fixture">'
+			)
+			expect(html).toContain(
+				'<meta property="og:image" content="https://cdn.example.com/fixture.jpg">'
+			)
 			expect(html).toContain(`<style>${inlineStyle}</style>`)
 			expect(html).toContain(`<script>${inlineScript}</script>`)
 			expect(html).toContain(
@@ -61,7 +67,8 @@ describe('Astro 7 build fixture', () => {
 				'https://cdn.example.com/site.css',
 				'https://cdn.example.com/critical.css',
 				'https://cdn.example.com/runtime.js',
-				'https://cdn.example.com/app.js'
+				'https://cdn.example.com/app.js',
+				'https://cdn.example.com/module.js'
 			]) {
 				expect(html).toContain(renderedResource)
 			}
@@ -73,6 +80,7 @@ describe('Astro 7 build fixture', () => {
 			expect(cspContent).toContain('style-src https://cdn.example.com')
 			expect(cspContent).not.toContain('https://cdn.example.com/runtime.js')
 			expect(cspContent).not.toContain('https://cdn.example.com/site.css')
+			expect(cspContent).not.toContain('https://cdn.example.com/module.js')
 
 			for (const hash of [
 				sha256CspHash(inlineStyle),

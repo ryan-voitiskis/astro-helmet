@@ -1,19 +1,33 @@
 ---
-import Helmet from 'astro-helmet'
+import Helmet, {
+	createSeoHead,
+	externalScript,
+	modulepreload,
+	preload,
+	stylesheet
+} from 'astro-helmet'
 import type { HeadItems } from 'astro-helmet'
 
-const headItems: HeadItems = {
+const seoHead = createSeoHead({
 	title: 'Astro Helmet Fixture',
-	meta: [{ name: 'description', content: 'Astro 7 fixture page' }],
+	description: 'Astro 7 fixture page',
+	openGraph: {
+		url: 'https://example.com/fixture',
+		image: 'https://cdn.example.com/fixture.jpg'
+	}
+})
+
+const resourceHead: HeadItems = {
 	link: [
-		{ rel: 'stylesheet', href: 'https://cdn.example.com/site.css' },
-		{ rel: 'preload', href: 'https://cdn.example.com/critical.css', as: 'style' },
-		{ rel: 'preload', href: 'https://cdn.example.com/app.js', as: 'script' }
+		stylesheet('https://cdn.example.com/site.css'),
+		preload('https://cdn.example.com/critical.css', { as: 'style' }),
+		preload('https://cdn.example.com/app.js', { as: 'script' }),
+		modulepreload('https://cdn.example.com/module.js')
 	],
-	style: [{ innerHTML: '.fixture-title { color: rebeccapurple; }' }],
+	style: [{ textContent: '.fixture-title { color: rebeccapurple; }' }],
 	script: [
-		{ src: 'https://cdn.example.com/runtime.js' },
-		{ innerHTML: 'window.__helmetFixture = true;' }
+		externalScript('https://cdn.example.com/runtime.js'),
+		{ textContent: 'window.__helmetFixture = true;' }
 	],
 	jsonLd: {
 		'@type': 'WebSite',
@@ -23,7 +37,10 @@ const headItems: HeadItems = {
 ---
 
 <html lang="en">
-	<Helmet headItems={headItems} options={{ csp: true }} />
+	<Helmet
+		headItems={[seoHead, resourceHead]}
+		options={{ csp: true, validate: false }}
+	/>
 	<body>
 		<h1 class="fixture-title">Astro Helmet Fixture</h1>
 	</body>

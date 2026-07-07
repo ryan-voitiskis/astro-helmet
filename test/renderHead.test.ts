@@ -86,6 +86,83 @@ describe('renderHead', () => {
 		expect(renderHead(params)).toEqual(expected)
 	})
 
+	it('Orders resource-hint links with case-insensitive rel tokens', () => {
+		const params = {
+			title: 'My Site Title',
+			link: [
+				{ rel: 'icon', href: '/favicon.ico' },
+				{ rel: 'StyleSheet', href: '/site.css' },
+				{ rel: 'MODULEPRELOAD', href: '/entry.js' },
+				{ rel: 'dns-prefetch', href: 'https://cdn.example.com' },
+				{ rel: 'preconnect', href: 'https://api.example.com' },
+				{ rel: 'preload', href: '/font.woff2', as: 'font' },
+				{ rel: 'prefetch', href: '/next.js' },
+				{ rel: 'prerender', href: '/next-page' }
+			]
+		}
+		const expected = `<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Site Title</title>
+<link rel="preconnect" href="https://api.example.com">
+<link rel="dns-prefetch" href="https://cdn.example.com">
+<link rel="StyleSheet" href="/site.css">
+<link rel="MODULEPRELOAD" href="/entry.js">
+<link rel="preload" href="/font.woff2" as="font">
+<link rel="prefetch" href="/next.js">
+<link rel="prerender" href="/next-page">
+<link rel="icon" href="/favicon.ico">`
+		expect(renderHead(params)).toEqual(expected)
+	})
+
+	it('Deduplicates canonical and resource-hint links with last-write-wins', () => {
+		const params = {
+			title: 'My Site Title',
+			link: [
+				{ rel: 'canonical', href: 'https://example.com/old' },
+				{ rel: 'canonical', href: 'https://example.com/new' },
+				{ rel: 'preconnect', href: 'https://cdn.example.com' },
+				{
+					rel: 'preconnect',
+					href: 'https://cdn.example.com',
+					crossorigin: 'anonymous'
+				},
+				{ rel: 'preload', href: '/app.js', as: 'script' },
+				{
+					rel: 'preload',
+					href: '/app.js',
+					as: 'script',
+					fetchpriority: 'high'
+				}
+			]
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('https://example.com/old')
+		expect(result).toContain(
+			'<link rel="canonical" href="https://example.com/new">'
+		)
+		expect(result.match(/rel="preconnect"/g)).toHaveLength(1)
+		expect(result).toContain(
+			'<link rel="preconnect" href="https://cdn.example.com" crossorigin="anonymous">'
+		)
+		expect(result.match(/rel="preload"/g)).toHaveLength(1)
+		expect(result).toContain(
+			'<link rel="preload" href="/app.js" as="script" fetchpriority="high">'
+		)
+	})
+
+	it('Keeps distinct preload variants for the same URL', () => {
+		const params = {
+			title: 'My Site Title',
+			link: [
+				{ rel: 'preload', href: '/asset', as: 'script' },
+				{ rel: 'preload', href: '/asset', as: 'style' }
+			]
+		}
+		const result = renderHead(params)
+		expect(result).toContain('<link rel="preload" href="/asset" as="script">')
+		expect(result).toContain('<link rel="preload" href="/asset" as="style">')
+	})
+
 	it('Render head with style tags', () => {
 		const params = {
 			title: 'My Site Title',
@@ -96,6 +173,60 @@ describe('renderHead', () => {
 <title>My Site Title</title>
 <style>body { color: red; }</style>`
 		expect(renderHead(params)).toEqual(expected)
+	})
+
+	it('Escapes textContent in inline style, script and noscript tags', () => {
+		const params = {
+			title: 'My Site Title',
+			style: [{ textContent: 'body::before { content: "</style>"; }' }],
+			script: [{ textContent: 'console.log("</SCRIPT>")' }],
+			noscript: [{ textContent: '<p>Please enable JavaScript</p>' }]
+		}
+		const result = renderHead(params)
+		expect(result).toContain(
+			'<style>body::before { content: "<\\/style>"; }</style>'
+		)
+		expect(result).toContain('<script>console.log("<\\/script>")</script>')
+		expect(result).toContain(
+			'<noscript>&lt;p&gt;Please enable JavaScript&lt;/p&gt;</noscript>'
+		)
+	})
+
+	it('Deduplicates keyed tags without rendering the key attribute', () => {
+		const params = [
+			{
+				title: 'First',
+				meta: [{ key: 'description', name: 'description', content: 'First' }],
+				link: [
+					{ key: 'canonical', rel: 'canonical', href: 'https://first.com' }
+				],
+				style: [{ key: 'critical', textContent: 'body { color: red; }' }],
+				script: [{ key: 'analytics', textContent: 'window.first = true;' }],
+				noscript: [{ key: 'fallback', textContent: 'First fallback' }]
+			},
+			{
+				title: 'Second',
+				meta: [{ key: 'description', name: 'description', content: 'Second' }],
+				link: [
+					{ key: 'canonical', rel: 'canonical', href: 'https://second.com' }
+				],
+				style: [{ key: 'critical', textContent: 'body { color: blue; }' }],
+				script: [{ key: 'analytics', textContent: 'window.second = true;' }],
+				noscript: [{ key: 'fallback', textContent: 'Second fallback' }]
+			}
+		]
+		const result = renderHead(params)
+		expect(result).not.toContain('First')
+		expect(result).not.toContain('https://first.com')
+		expect(result).not.toContain('color: red')
+		expect(result).not.toContain('window.first')
+		expect(result).toContain('<title>Second</title>')
+		expect(result).toContain('<meta name="description" content="Second">')
+		expect(result).toContain('<link rel="canonical" href="https://second.com">')
+		expect(result).toContain('<style>body { color: blue; }</style>')
+		expect(result).toContain('<script>window.second = true;</script>')
+		expect(result).toContain('<noscript>Second fallback</noscript>')
+		expect(result).not.toContain('key=')
 	})
 
 	it('Render head with ordered various style tags', () => {
@@ -114,6 +245,24 @@ describe('renderHead', () => {
 <style>body { color: red; }</style>
 <style>body { background-color: blue; }</style>`
 		expect(renderHead(params)).toEqual(expected)
+	})
+
+	it('Orders @import styles early when authored with textContent', () => {
+		const params = {
+			title: 'My Site Title',
+			style: [
+				{ textContent: 'body { color: red; }' },
+				{ textContent: '@import url("imported.css");body { color: blue; }' }
+			],
+			script: [{ textContent: 'window.ready = true;' }]
+		}
+		const result = renderHead(params)
+		expect(result.indexOf('@import url')).toBeLessThan(
+			result.indexOf('window.ready')
+		)
+		expect(result.indexOf('@import url')).toBeLessThan(
+			result.indexOf('body { color: red; }')
+		)
 	})
 
 	it('Render head with script tags', () => {
@@ -364,6 +513,45 @@ describe('renderHead', () => {
 		expect(result).not.toMatch(/charset="UTF-8"/)
 	})
 
+	it('Deduplicates meta names and http-equiv values case-insensitively', () => {
+		const params = {
+			title: 'T',
+			meta: [
+				{ name: 'Description', content: 'Old' },
+				{ name: 'description', content: 'New' },
+				{ 'http-equiv': 'Refresh', content: '60' },
+				{ 'http-equiv': 'refresh', content: '30' }
+			]
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('content="Old"')
+		expect(result).not.toContain('content="60"')
+		expect(result).toContain('<meta name="description" content="New">')
+		expect(result).toContain('<meta http-equiv="refresh" content="30">')
+	})
+
+	it('Suppresses the default viewport with a case-insensitive viewport meta name', () => {
+		const params = {
+			title: 'T',
+			meta: [{ name: 'Viewport', content: 'width=device-width' }]
+		}
+		const result = renderHead(params)
+		expect(result.match(/name="Viewport"|name="viewport"/g)).toHaveLength(1)
+		expect(result).toContain(
+			'<meta name="Viewport" content="width=device-width">'
+		)
+	})
+
+	it('Does not suppress default charset for an empty charset value', () => {
+		const params = {
+			title: 'T',
+			meta: [{ charset: '' }]
+		}
+		const result = renderHead(params)
+		expect(result).toContain('<meta charset="UTF-8">')
+		expect(result).toContain('<meta charset="">')
+	})
+
 	it('Deduplicates same-media meta tags via last-write-wins', () => {
 		const params = {
 			title: 'T',
@@ -487,9 +675,7 @@ describe('JSON-LD', () => {
 				{ '@type': 'Article', headline: 'My Article' },
 				{
 					'@type': 'BreadcrumbList',
-					itemListElement: [
-						{ '@type': 'ListItem', position: 1, name: 'Home' }
-					]
+					itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home' }]
 				}
 			]
 		}
@@ -513,6 +699,19 @@ describe('JSON-LD', () => {
 		const result = renderHead(params)
 		expect(result).not.toContain('</script><script>')
 		expect(result).toContain('<\\/script>')
+	})
+
+	it('Escapes mixed-case </script> in JSON-LD values', () => {
+		const params: HeadItems = {
+			title: 'My Article',
+			jsonLd: {
+				'@type': 'Article',
+				headline: 'Test </SCRIPT>'
+			}
+		}
+		const result = renderHead(params)
+		expect(result).not.toContain('</SCRIPT>')
+		expect(result).toContain('<\\/SCRIPT>')
 	})
 
 	it('Array merge from HeadItems[] concatenates JSON-LD blocks', () => {
@@ -543,12 +742,8 @@ describe('JSON-LD', () => {
 		}
 		const result = renderHead(params)
 		const lines = result.split('\n')
-		const metaDescIdx = lines.findIndex((l) =>
-			l.includes('name="description"')
-		)
-		const jsonLdIdx = lines.findIndex((l) =>
-			l.includes('application/ld+json')
-		)
+		const metaDescIdx = lines.findIndex((l) => l.includes('name="description"'))
+		const jsonLdIdx = lines.findIndex((l) => l.includes('application/ld+json'))
 		const noscriptIdx = lines.findIndex((l) => l.includes('<noscript>'))
 		expect(metaDescIdx).toBeLessThan(jsonLdIdx)
 		expect(jsonLdIdx).toBeLessThan(noscriptIdx)

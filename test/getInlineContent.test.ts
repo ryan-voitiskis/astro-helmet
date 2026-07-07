@@ -110,6 +110,24 @@ describe('getInlineContent', () => {
 		])
 	})
 
+	it('Uses textContent and keyed deduplication to match rendered inline content', () => {
+		const params: HeadItems[] = [
+			{
+				title: 'Test',
+				style: [{ key: 'critical', textContent: 'body { color: red }' }],
+				script: [{ key: 'boot', textContent: 'window.old = true;' }]
+			},
+			{
+				style: [{ key: 'critical', textContent: 'body { color: blue }' }],
+				script: [{ key: 'boot', textContent: 'window.new = true;' }]
+			}
+		]
+		expect(getInlineContent(params)).toEqual([
+			{ type: 'style', content: 'body { color: blue }' },
+			{ type: 'script', content: 'window.new = true;' }
+		])
+	})
+
 	it('Excludes noscript innerHTML from inline content', () => {
 		const params: HeadItems = {
 			title: 'Test',

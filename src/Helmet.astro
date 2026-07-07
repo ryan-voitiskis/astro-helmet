@@ -1,17 +1,35 @@
 ---
-import { type HeadItems, type Tag, renderHead, getInlineContent, getExternalResources } from './main'
+import {
+	type HeadItems,
+	type HelmetOptions,
+	renderHead,
+	getInlineContent,
+	getExternalResources,
+	validateHeadItems
+} from './main'
 
 interface Props {
 	headItems: HeadItems | HeadItems[]
-	options?: {
-		omitHeadTags?: boolean
-		applyPriority?: (tag: Tag) => Required<Tag>
-		csp?: boolean
-	}
+	options?: HelmetOptions
 }
 
 const { headItems, options = {} } = Astro.props as Props
-const { applyPriority, omitHeadTags = false, csp: cspEnabled = false } = options
+const {
+	applyPriority,
+	omitHeadTags = false,
+	csp: cspEnabled = false,
+	validate = import.meta.env.DEV
+} = options
+if (validate) {
+	const validationOptions = typeof validate === 'object' ? validate : undefined
+	for (const issue of validateHeadItems(headItems, validationOptions)) {
+		console.warn(
+			`[astro-helmet] ${issue.code}: ${issue.message}${
+				issue.path ? ` (${issue.path})` : ''
+			}`
+		)
+	}
+}
 const head = renderHead(headItems, applyPriority)
 
 // Register CSP hashes and resources when the consumer opts in via `options.csp`
@@ -20,14 +38,16 @@ const head = renderHead(headItems, applyPriority)
 // silent for users who don't need CSP integration. Cast avoids typecheck
 // failures for downstream consumers on Astro 4/5.
 const csp = cspEnabled
-	? (Astro as unknown as {
-			csp?: {
-				insertScriptHash(hash: string): void
-				insertStyleHash(hash: string): void
-				insertScriptResource(resource: string): void
-				insertStyleResource(resource: string): void
+	? (
+			Astro as unknown as {
+				csp?: {
+					insertScriptHash(hash: string): void
+					insertStyleHash(hash: string): void
+					insertScriptResource(resource: string): void
+					insertStyleResource(resource: string): void
+				}
 			}
-		}).csp
+		).csp
 	: undefined
 if (csp) {
 	for (const { type, content } of getInlineContent(headItems)) {

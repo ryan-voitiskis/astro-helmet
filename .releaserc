@@ -1,6 +1,10 @@
 {
 	"branches": [
-		"main"
+		"main",
+		{
+			"name": "beta",
+			"prerelease": true
+		}
 	],
 	"repositoryUrl": "https://github.com/ryan-voitiskis/astro-helmet.git",
 	"plugins": [

@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - beta
   pull_request:
     branches:
       - main
+      - beta
 
 jobs:
   ci:
@@ -58,11 +60,20 @@ jobs:
 
           cat > src/pages/index.astro <<'EOF'
           ---
-          import Helmet from 'astro-helmet'
+          import Helmet, { createSeoHead, preloadFont } from 'astro-helmet'
           import type { HeadItems } from 'astro-helmet'
 
-          const headItems: HeadItems = {
+          const seoHead = createSeoHead({
             title: 'Consumer Fixture',
+            description: 'Packed package consumer fixture',
+            openGraph: {
+              image: 'https://example.com/og.jpg'
+            }
+          })
+
+          const resourceHead: HeadItems = {
+            title: 'Consumer Fixture',
+            link: [preloadFont('/consumer.woff2', { type: 'font/woff2' })],
             style: [{ innerHTML: '.consumer { color: green; }' }],
             script: [{ innerHTML: 'window.__consumerFixture = true;' }],
             jsonLd: { '@type': 'WebSite', name: 'Consumer' }
@@ -70,16 +81,30 @@ jobs:
           ---
 
           <html lang="en">
-            <Helmet {headItems} />
+            <Helmet headItems={[seoHead, resourceHead]} options={{ validate: false }} />
             <body><h1 class="consumer">Consumer Fixture</h1></body>
           </html>
           EOF
 
           cat > type-import.ts <<'EOF'
-          import type { HeadItems } from 'astro-helmet'
+          import {
+            createSeoHead,
+            preconnect,
+            validateHeadItems,
+            type HeadItems,
+            type HelmetOptions,
+            type HeadValidationIssue
+          } from 'astro-helmet'
 
-          const headItems: HeadItems = { title: 'Types only' }
-          void headItems
+          const headItems: HeadItems = createSeoHead({
+            title: 'Types only',
+            description: 'Types only description'
+          })
+          headItems.link = [preconnect('https://example.com')]
+          const options: HelmetOptions = { validate: { requireSri: true } }
+          const validationOptions = typeof options.validate === 'object' ? options.validate : undefined
+          const issues: HeadValidationIssue[] = validateHeadItems(headItems, validationOptions)
+          void issues
           EOF
 
           npx astro build > build.log 2>&1

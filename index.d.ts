@@ -1,53 +1,52 @@
+import type { HeadItems, HelmetOptions } from './src/main.js'
+
 declare const Helmet: (props: {
 	headItems: HeadItems | HeadItems[]
-	options?: {
-		omitHeadTags?: boolean
-		applyPriority?: (tag: Tag) => Required<Tag>
-		csp?: boolean
-	}
+	options?: HelmetOptions
 }) => unknown
 
 export default Helmet
 
-type TagName =
-	| 'title'
-	| 'base'
-	| 'meta'
-	| 'link'
-	| 'style'
-	| 'script'
-	| 'noscript'
+export {
+	createSeoHead,
+	dnsPrefetch,
+	externalScript,
+	modulepreload,
+	preconnect,
+	preload,
+	preloadFont,
+	preloadImage,
+	stylesheet,
+	validateHeadItems
+} from './src/main.js'
 
-type BaseItem = {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	[key: string]: any
-	priority?: number
-}
-
-type ContentItem = BaseItem & {
-	innerHTML?: string
-}
-
-export type Tag = (BaseItem | ContentItem) & {
-	tagName: TagName
-	priority?: number
-}
-
-export type JsonLdItem = {
-	'@type': string
-	/** Automatically injected - do not provide. */
-	'@context'?: never
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	[key: string]: any
-}
-
-export type HeadItems = {
-	title?: string
-	base?: BaseItem[]
-	meta?: BaseItem[]
-	link?: BaseItem[]
-	style?: ContentItem[]
-	script?: ContentItem[]
-	noscript?: ContentItem[]
-	jsonLd?: JsonLdItem | JsonLdItem[]
-}
+export type {
+	AlternateLink,
+	CrossOrigin,
+	ExternalScriptOptions,
+	FetchPriority,
+	HeadItems,
+	HeadValidationCode,
+	HeadValidationIssue,
+	HeadValidationOptions,
+	HeadValidationSeverity,
+	HelmetOptions,
+	JsonLdItem,
+	LinkItem,
+	MetaItem,
+	NoscriptItem,
+	OpenGraphOptions,
+	PreloadFontOptions,
+	PreloadImageOptions,
+	PreloadOptions,
+	ReferrerPolicy,
+	ResourceHintOptions,
+	RobotsOptions,
+	ScriptItem,
+	SeoHeadOptions,
+	SeoImage,
+	StyleItem,
+	StylesheetOptions,
+	Tag,
+	TwitterOptions
+} from './src/main.js'

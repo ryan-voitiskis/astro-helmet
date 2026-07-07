@@ -21,13 +21,32 @@ describe('getExternalResources', () => {
 		])
 	})
 
+	it('Normalizes URL object script and link resources to strings', () => {
+		const params: HeadItems = {
+			title: 'Test',
+			script: [{ src: new URL('https://cdn.example.com/app.js') }],
+			link: [
+				{
+					rel: 'stylesheet',
+					href: new URL('https://cdn.example.com/site.css')
+				},
+				{
+					rel: 'modulepreload',
+					href: new URL('https://cdn.example.com/entry.js')
+				}
+			]
+		}
+		expect(getExternalResources(params)).toEqual([
+			{ type: 'script', url: 'https://cdn.example.com/app.js' },
+			{ type: 'style', url: 'https://cdn.example.com/site.css' },
+			{ type: 'script', url: 'https://cdn.example.com/entry.js' }
+		])
+	})
+
 	it('Skips inline scripts (no src)', () => {
 		const params: HeadItems = {
 			title: 'Test',
-			script: [
-				{ innerHTML: 'console.log("hi")' },
-				{ src: '/app.js' }
-			]
+			script: [{ innerHTML: 'console.log("hi")' }, { src: '/app.js' }]
 		}
 		expect(getExternalResources(params)).toEqual([
 			{ type: 'script', url: '/app.js' }
@@ -51,6 +70,50 @@ describe('getExternalResources', () => {
 		}
 		expect(getExternalResources(params)).toEqual([
 			{ type: 'script', url: '/app.js' }
+		])
+	})
+
+	it('Returns modulepreload URLs as script type', () => {
+		const params: HeadItems = {
+			title: 'Test',
+			link: [{ rel: 'modulepreload', href: '/entry.js' }]
+		}
+		expect(getExternalResources(params)).toEqual([
+			{ type: 'script', url: '/entry.js' }
+		])
+	})
+
+	it('Matches rel and as values case-insensitively', () => {
+		const params: HeadItems = {
+			title: 'Test',
+			link: [
+				{ rel: 'StyleSheet', href: '/site.css' },
+				{ rel: 'PRELOAD', href: '/app.js', as: 'SCRIPT' },
+				{ rel: 'preload', href: '/style.css', as: 'STYLE' },
+				{ rel: 'MODULEPRELOAD', href: '/module.js' }
+			]
+		}
+		expect(getExternalResources(params)).toEqual([
+			{ type: 'style', url: '/site.css' },
+			{ type: 'script', url: '/app.js' },
+			{ type: 'style', url: '/style.css' },
+			{ type: 'script', url: '/module.js' }
+		])
+	})
+
+	it('Deduplicates preload and modulepreload resources before returning external resources', () => {
+		const params: HeadItems = {
+			title: 'Test',
+			link: [
+				{ rel: 'preload', href: '/app.js', as: 'script' },
+				{ rel: 'preload', href: '/app.js', as: 'script' },
+				{ rel: 'modulepreload', href: '/entry.js' },
+				{ rel: 'modulepreload', href: '/entry.js' }
+			]
+		}
+		expect(getExternalResources(params)).toEqual([
+			{ type: 'script', url: '/app.js' },
+			{ type: 'script', url: '/entry.js' }
 		])
 	})
 
