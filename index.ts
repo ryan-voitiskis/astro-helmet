@@ -35,6 +35,7 @@ export type {
 	PreloadImageOptions,
 	PreloadOptions,
 	ReferrerPolicy,
+	ResponsivePreloadImageOptions,
 	ResourceHintOptions,
 	RobotsOptions,
 	ScriptItem,

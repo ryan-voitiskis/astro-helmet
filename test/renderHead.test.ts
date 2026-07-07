@@ -163,6 +163,55 @@ describe('renderHead', () => {
 		expect(result).toContain('<link rel="preload" href="/asset" as="style">')
 	})
 
+	it('Deduplicates href-less responsive image preloads', () => {
+		const params = {
+			title: 'Responsive Preloads',
+			link: [
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+					imagesizes: '100vw',
+					fetchpriority: 'low'
+				},
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+					imagesizes: '100vw',
+					fetchpriority: 'high'
+				},
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+					imagesizes: '(min-width: 800px) 50vw, 100vw',
+					fetchpriority: 'high'
+				},
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+					imagesizes: '100vw',
+					media: '(min-width: 800px)',
+					fetchpriority: 'high'
+				}
+			]
+		}
+		const result = renderHead(params)
+		expect(result.match(/rel="preload"/g)).toHaveLength(3)
+		expect(result).not.toContain('fetchpriority="low"')
+		expect(result).toContain(
+			'<link rel="preload" as="image" imagesrcset="/hero-640.jpg 640w, /hero-1280.jpg 1280w" imagesizes="100vw" fetchpriority="high">'
+		)
+		expect(result).toContain(
+			'<link rel="preload" as="image" imagesrcset="/hero-640.jpg 640w, /hero-1280.jpg 1280w" imagesizes="(min-width: 800px) 50vw, 100vw" fetchpriority="high">'
+		)
+		expect(result).toContain(
+			'<link rel="preload" as="image" imagesrcset="/hero-640.jpg 640w, /hero-1280.jpg 1280w" imagesizes="100vw" media="(min-width: 800px)" fetchpriority="high">'
+		)
+	})
+
 	it('Render head with style tags', () => {
 		const params = {
 			title: 'My Site Title',

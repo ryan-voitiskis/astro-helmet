@@ -107,8 +107,10 @@ export type HeadValidationCode =
 	| 'relative-canonical'
 	| 'canonical-with-noindex'
 	| 'invalid-url'
+	| 'missing-preload-source'
 	| 'invalid-preload-as'
 	| 'missing-preload-as'
+	| 'responsive-image-missing-sizes'
 	| 'font-preload-missing-crossorigin'
 	| 'modulepreload-with-as'
 	| 'preconnect-missing-href'
@@ -157,6 +159,11 @@ export type PreloadImageOptions = ResourceHintOptions & {
 	imagesrcset?: string
 	imagesizes?: string
 	fetchpriority?: FetchPriority
+}
+
+export type ResponsivePreloadImageOptions = PreloadImageOptions & {
+	href?: string | URL
+	imagesrcset: string
 }
 
 export type StylesheetOptions = Omit<LinkItem, 'rel' | 'href'>
@@ -507,9 +514,26 @@ export function preloadFont(
 
 export function preloadImage(
 	href: string | URL,
+	options?: PreloadImageOptions
+): LinkItem
+export function preloadImage(options: ResponsivePreloadImageOptions): LinkItem
+export function preloadImage(
+	hrefOrOptions: string | URL | ResponsivePreloadImageOptions,
 	options: PreloadImageOptions = {}
 ): LinkItem {
-	return { ...options, rel: 'preload', href: toUrlString(href), as: 'image' }
+	if (typeof hrefOrOptions === 'string' || hrefOrOptions instanceof URL) {
+		return {
+			...options,
+			rel: 'preload',
+			href: toUrlString(hrefOrOptions),
+			as: 'image'
+		}
+	}
+
+	const { href, ...rest } = hrefOrOptions
+	const link: LinkItem = { ...rest, rel: 'preload', as: 'image' }
+	if (href !== undefined) link.href = toUrlString(href)
+	return link
 }
 
 export function modulepreload(
@@ -844,6 +868,21 @@ function validatePreload(
 	path: string
 ): void {
 	const as = normaliseAttrValue(link.as).toLowerCase()
+	const href = normaliseAttrValue(link.href)
+	const imagesrcset = normaliseAttrValue(link.imagesrcset)
+	const hasResponsiveImageSource = as === 'image' && !!imagesrcset
+
+	if (!href && !hasResponsiveImageSource) {
+		issues.push({
+			code: 'missing-preload-source',
+			severity: 'warning',
+			tagName: 'link',
+			path,
+			message:
+				'Preload links need an href, except responsive image preloads with imagesrcset.'
+		})
+	}
+
 	if (!as) {
 		issues.push({
 			code: 'missing-preload-as',
@@ -862,6 +901,21 @@ function validatePreload(
 			tagName: 'link',
 			path,
 			message: `Preload as="${as}" is not a standard destination.`
+		})
+	}
+
+	if (
+		as === 'image' &&
+		hasWidthDescriptorImageSrcset(imagesrcset) &&
+		!hasNonEmptyAttr(link, 'imagesizes')
+	) {
+		issues.push({
+			code: 'responsive-image-missing-sizes',
+			severity: 'warning',
+			tagName: 'link',
+			path,
+			message:
+				'Responsive image preloads with width descriptors need imagesizes.'
 		})
 	}
 
@@ -1049,6 +1103,13 @@ function isSriRelevantLink(link: LinkItem): boolean {
 	if (!hasRel(link, 'preload')) return false
 	const as = normaliseAttrValue(link.as).toLowerCase()
 	return as === 'script' || as === 'style'
+}
+
+function hasWidthDescriptorImageSrcset(imagesrcset: string): boolean {
+	return imagesrcset.split(',').some((candidate) => {
+		const descriptor = candidate.trim().split(/\s+/).at(-1) || ''
+		return /^\d+w$/.test(descriptor)
+	})
 }
 
 function hasRobotsDirective(metaItems: MetaItem[], directive: string): boolean {
@@ -1404,7 +1465,9 @@ function getLinkDeduplicationKey(link: BaseItem): string | undefined {
 	if ((rels.includes('preconnect') || rels.includes('dns-prefetch')) && href)
 		return `${rels.join(' ')}:${href}`
 
-	if ((rels.includes('preload') || rels.includes('modulepreload')) && href)
+	if (rels.includes('preload') || rels.includes('modulepreload')) {
+		if (!href && !(rels.includes('preload') && as === 'image' && imagesrcset))
+			return undefined
 		return [
 			rels.join(' '),
 			href,
@@ -1415,6 +1478,7 @@ function getLinkDeduplicationKey(link: BaseItem): string | undefined {
 			imagesrcset,
 			imagesizes
 		].join(':')
+	}
 }
 
 function renderHeadTag(item: BaseItem | ContentItem): string {

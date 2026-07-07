@@ -96,12 +96,29 @@ const headItems: HeadItems = {
     preconnect('https://cdn.example.com'),
     preloadFont('/fonts/Inter.woff2', { type: 'font/woff2' }),
     preloadImage('/images/hero.jpg', { fetchpriority: 'high' }),
+    preloadImage({
+      imagesrcset: '/images/hero-640.jpg 640w, /images/hero-1280.jpg 1280w',
+      imagesizes: '100vw',
+      fetchpriority: 'high'
+    }),
     modulepreload('/scripts/entry.js'),
     stylesheet('/styles/site.css')
   ],
   script: [externalScript('/scripts/app.js', { defer: true })]
 }
 ```
+
+`preloadImage()` also supports responsive image preloads without a fallback `href`:
+
+```ts
+preloadImage({
+  imagesrcset: '/images/hero-640.jpg 640w, /images/hero-1280.jpg 1280w',
+  imagesizes: '100vw',
+  fetchpriority: 'high'
+})
+```
+
+Use this when you want browsers that support responsive preloads to choose from `imagesrcset` without causing an additional fallback preload in browsers that do not. Width-descriptor `imagesrcset` values such as `640w` should include `imagesizes`; density descriptors such as `1x, 2x` do not need it.
 
 ### SEO Helper
 
@@ -259,7 +276,7 @@ Meta items later in the array replace earlier items. `name` and `http-equiv` mat
 
 - `rel="canonical"` links, keeping the last one.
 - `rel="preconnect"` and `rel="dns-prefetch"` links with the same `href`, keeping the last one.
-- `rel="preload"` and `rel="modulepreload"` links with the same `href`, `as`, `type`, `crossorigin`, `media`, `imagesrcset`, and `imagesizes`, keeping the last one.
+- `rel="preload"` and `rel="modulepreload"` links with the same `href`, `as`, `type`, `crossorigin`, `media`, `imagesrcset`, and `imagesizes`, keeping the last one. Responsive image preloads without `href` are deduplicated by `as`, `type`, `crossorigin`, `media`, `imagesrcset`, and `imagesizes`.
 
 Any `meta`, `link`, `style`, `script`, or `noscript` item may provide `key` to opt into explicit last-write-wins deduplication:
 
@@ -327,7 +344,7 @@ const issues = validateHeadItems(headItems, {
 })
 ```
 
-Validation returns structured issues with `code`, `severity`, `message`, `tagName`, and `path`. It checks for common mistakes such as missing titles/descriptions, duplicate or relative canonicals, invalid preloads, font preloads without `crossorigin`, incomplete Open Graph basics, relative Open Graph/Twitter image URLs, raw `innerHTML`, inline event attributes, JSON-LD serialization errors, and optional missing SRI on external scripts/styles.
+Validation returns structured issues with `code`, `severity`, `message`, `tagName`, and `path`. It checks for common mistakes such as missing titles/descriptions, duplicate or relative canonicals, invalid preloads, preloads without a usable source, responsive image preloads that use width descriptors without `imagesizes`, font preloads without `crossorigin`, incomplete Open Graph basics, relative Open Graph/Twitter image URLs, raw `innerHTML`, inline event attributes, JSON-LD serialization errors, and optional missing SRI on external scripts/styles.
 
 Set `requireOpenGraphImage: true` if every shareable page in your project should provide `og:image`. By default, image-less website pages are allowed so dev validation does not warn on simple pages that still have useful `og:title`, `og:type`, and `og:url` tags.
 

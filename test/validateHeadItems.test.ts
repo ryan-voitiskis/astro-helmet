@@ -66,6 +66,58 @@ describe('validateHeadItems', () => {
 		])
 	})
 
+	it('Allows href-less responsive image preloads with imagesrcset', () => {
+		const result = codes({
+			title: 'Responsive preload',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero.jpg 1x, /hero@2x.jpg 2x'
+				}
+			]
+		})
+		expect(result).toEqual([])
+	})
+
+	it('Warns when preload links have no usable source', () => {
+		const result = codes({
+			title: 'Missing preload sources',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [
+				{ rel: 'preload', as: 'script' },
+				{ rel: 'preload', as: 'font', crossorigin: 'anonymous' },
+				{ rel: 'preload', as: 'image' }
+			]
+		})
+		expect(result).toEqual([
+			'missing-preload-source',
+			'missing-preload-source',
+			'missing-preload-source'
+		])
+	})
+
+	it('Warns when responsive image width descriptors omit imagesizes', () => {
+		const result = codes({
+			title: 'Responsive sizes',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w'
+				},
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero.jpg 1x, /hero@2x.jpg 2x'
+				}
+			]
+		})
+		expect(result).toEqual(['responsive-image-missing-sizes'])
+	})
+
 	it('Treats empty crossorigin as present for validation', () => {
 		const result = codes({
 			title: 'Crossorigin',

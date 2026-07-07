@@ -77,6 +77,7 @@ describe('public declarations', () => {
 						createSeoHead,
 						preconnect,
 						preloadFont,
+						preloadImage,
 						validateHeadItems,
 						type HeadItems,
 						type HeadValidationIssue,
@@ -97,8 +98,15 @@ describe('public declarations', () => {
 					})
 					headItems.link = [
 						preconnect('https://cdn.example.com'),
-						preloadFont('/Inter.woff2', { type: 'font/woff2' })
+						preloadFont('/Inter.woff2', { type: 'font/woff2' }),
+						preloadImage({
+							imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+							imagesizes: '100vw',
+							fetchpriority: 'high'
+						})
 					]
+					// @ts-expect-error href-less responsive image preloads need imagesrcset
+					preloadImage({ imagesizes: '100vw' })
 					const options: HelmetOptions = {
 						validate: {
 							baseUrl: 'https://example.com',

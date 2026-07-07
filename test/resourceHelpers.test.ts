@@ -77,6 +77,50 @@ describe('resource helpers', () => {
 			imagesizes: '100vw',
 			fetchpriority: 'high'
 		})
+
+		expect(
+			preloadImage({
+				imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+				imagesizes: '100vw',
+				fetchpriority: 'high'
+			})
+		).toEqual({
+			rel: 'preload',
+			as: 'image',
+			imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+			imagesizes: '100vw',
+			fetchpriority: 'high'
+		})
+
+		expect(
+			preloadImage({
+				href: '/hero.jpg',
+				imagesrcset: '/hero.jpg 1x, /hero@2x.jpg 2x'
+			})
+		).toEqual({
+			rel: 'preload',
+			as: 'image',
+			href: '/hero.jpg',
+			imagesrcset: '/hero.jpg 1x, /hero@2x.jpg 2x'
+		})
+	})
+
+	it('Renders responsive image preloads without a fallback href', () => {
+		const rendered = renderHead({
+			title: 'Responsive Image',
+			link: [
+				preloadImage({
+					imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+					imagesizes: '100vw',
+					fetchpriority: 'high'
+				})
+			]
+		})
+
+		expect(rendered).toContain(
+			'<link imagesrcset="/hero-640.jpg 640w, /hero-1280.jpg 1280w" imagesizes="100vw" fetchpriority="high" rel="preload" as="image">'
+		)
+		expect(rendered).not.toContain('href=')
 	})
 
 	it('Works inside rendered head and CSP resource discovery', () => {
