@@ -134,6 +134,17 @@ describe('renderAttrs', () => {
 		expect(renderAttrs(attributes)).toEqual('content="a&lt;b&gt;c"')
 	})
 
+	it('Drops invalid attribute names', () => {
+		const attributes = {
+			'data-safe': 'yes',
+			'onload="alert(1)"': 'bad',
+			'bad name': 'bad',
+			'bad<name': 'bad',
+			'bad/name': 'bad'
+		}
+		expect(renderAttrs(attributes)).toEqual('data-safe="yes"')
+	})
+
 	it('No attributes', () => {
 		const attributes = {}
 		const expected = ''

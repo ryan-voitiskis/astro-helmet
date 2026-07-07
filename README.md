@@ -21,6 +21,8 @@ Install `astro-helmet` using npm:
 npm i astro-helmet
 ```
 
+`astro-helmet` supports Astro 4, 5, 6, and 7.
+
 ## Usage
 
 In your Layout component, import `astro-helmet` and pass an object of `headItems` to the `Helmet` component.
@@ -54,7 +56,7 @@ Any attribute can be added to a head item. Simply provide the attribute as a key
 
 `'innerHTML', 'priority', 'tagName'` are reserved keys and cannot be used as attributes.
 
-To add content to a tag, use the `innerHTML` key. This will render the content inside the tag.
+To add content to a tag, use the `innerHTML` key. This will render the content inside the tag. Only pass trusted content to `innerHTML`; it is intended for code and markup that your application controls, such as inline scripts, inline styles, and `noscript` fallbacks.
 
 To control the order of head items, use the `priority` key.
 
@@ -176,6 +178,8 @@ Meta items later in the array replace earlier items. Meta tags without any of th
 
 `title` and `base` items are also deduplicated, with the last item in the array taking precedence.
 
+At least one merged `HeadItems` object must provide a non-empty `title`; otherwise `renderHead()` will throw.
+
 ### Props
 
 The `Helmet` component takes two props:
@@ -186,6 +190,7 @@ interface Props {
   options?: {
     omitHeadTags?: boolean
     applyPriority?: (tag: Tag) => Required<Tag>
+    csp?: boolean
   }
 }
 ```
@@ -286,6 +291,16 @@ function applyPriority(tag: Tag): Required<Tag> {
   return { ...tag, priority }
 }
 ```
+
+#### `csp`
+
+Set `options.csp` to `true` to register inline script/style hashes and external script/style sources with Astro's CSP runtime API.
+
+```astro
+<Helmet {headItems} options={{ csp: true }} />
+```
+
+Leave this disabled unless your Astro project has `security.csp` configured. Astro warns when `Astro.csp` is accessed without CSP enabled, so `astro-helmet` keeps CSP registration opt-in.
 
 Provide a custom `applyPriority()` function to reorder head items as needed.
 

@@ -9,8 +9,91 @@ on:
       - main
 
 jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --run
+
+  consumer-matrix:
+    name: Astro ${{ matrix.astro }} Consumer
+    runs-on: ubuntu-latest
+    needs: ci
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        astro: [4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build packed package in Astro consumer
+        env:
+          ASTRO_VERSION: ${{ matrix.astro }}
+        run: |
+          set -euo pipefail
+
+          TARBALL_PATH="$RUNNER_TEMP/$(npm pack --pack-destination "$RUNNER_TEMP" --silent)"
+          APP_DIR="$RUNNER_TEMP/astro-$ASTRO_VERSION-consumer"
+
+          mkdir -p "$APP_DIR/src/pages"
+          cd "$APP_DIR"
+          npm init -y >/dev/null
+          npm install --silent "astro@$ASTRO_VERSION" "$TARBALL_PATH" typescript@6.0.3
+
+          cat > src/pages/index.astro <<'EOF'
+          ---
+          import Helmet from 'astro-helmet'
+          import type { HeadItems } from 'astro-helmet'
+
+          const headItems: HeadItems = {
+            title: 'Consumer Fixture',
+            style: [{ innerHTML: '.consumer { color: green; }' }],
+            script: [{ innerHTML: 'window.__consumerFixture = true;' }],
+            jsonLd: { '@type': 'WebSite', name: 'Consumer' }
+          }
+          ---
+
+          <html lang="en">
+            <Helmet {headItems} />
+            <body><h1 class="consumer">Consumer Fixture</h1></body>
+          </html>
+          EOF
+
+          cat > type-import.ts <<'EOF'
+          import type { HeadItems } from 'astro-helmet'
+
+          const headItems: HeadItems = { title: 'Types only' }
+          void headItems
+          EOF
+
+          npx astro build > build.log 2>&1
+          if grep -E "context\\.csp|CspNotEnabled|Cannot find module|ERESOLVE" build.log; then
+            cat build.log
+            exit 1
+          fi
+
+          npx tsc --noEmit --module NodeNext --moduleResolution NodeNext --target ES2022 --strict type-import.ts
+
   release:
     name: Release
+    if: github.event_name == 'push'
+    needs: [ci, consumer-matrix]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,11 +106,9 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - name: Release
         run: npm run release
         env:

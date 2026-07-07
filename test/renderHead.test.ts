@@ -10,6 +10,14 @@ describe('renderHead', () => {
 		expect(renderHead(params)).toEqual(expected)
 	})
 
+	it('Escapes title text content', () => {
+		const params = { title: '</title><script>alert("xss")</script>' }
+		const expected = `<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>&lt;/title&gt;&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;</title>`
+		expect(renderHead(params)).toEqual(expected)
+	})
+
 	it('Render head with base tag', () => {
 		const params = {
 			title: 'My Site Title',
@@ -394,6 +402,41 @@ describe('renderHead', () => {
 		const result = renderHead(params)
 		const matches = result.match(/itemprop="name"/g)
 		expect(matches).toHaveLength(2)
+	})
+
+	it('Preserves relative order between keyed and keyless meta tags', () => {
+		const params = {
+			title: 'T',
+			meta: [
+				{ name: 'description', content: 'First' },
+				{ itemprop: 'name', content: 'Keyless' },
+				{ property: 'og:title', content: 'Open Graph title' }
+			]
+		}
+		const result = renderHead(params)
+		expect(result.indexOf('name="description"')).toBeLessThan(
+			result.indexOf('itemprop="name"')
+		)
+		expect(result.indexOf('itemprop="name"')).toBeLessThan(
+			result.indexOf('property="og:title"')
+		)
+	})
+
+	it('Does not deduplicate meta tags across name and property namespaces', () => {
+		const params = {
+			title: 'T',
+			meta: [
+				{ name: 'description', content: 'Name description' },
+				{ property: 'description', content: 'Property description' }
+			]
+		}
+		const result = renderHead(params)
+		expect(result).toContain(
+			'<meta name="description" content="Name description">'
+		)
+		expect(result).toContain(
+			'<meta property="description" content="Property description">'
+		)
 	})
 
 	it('Does not deduplicate meta tags with same name but different media attributes', () => {

@@ -1,0 +1,30 @@
+---
+import Helmet from 'astro-helmet'
+import type { HeadItems } from 'astro-helmet'
+
+const headItems: HeadItems = {
+	title: 'Astro Helmet Fixture',
+	meta: [{ name: 'description', content: 'Astro 7 fixture page' }],
+	link: [
+		{ rel: 'stylesheet', href: 'https://cdn.example.com/site.css' },
+		{ rel: 'preload', href: 'https://cdn.example.com/critical.css', as: 'style' },
+		{ rel: 'preload', href: 'https://cdn.example.com/app.js', as: 'script' }
+	],
+	style: [{ innerHTML: '.fixture-title { color: rebeccapurple; }' }],
+	script: [
+		{ src: 'https://cdn.example.com/runtime.js' },
+		{ innerHTML: 'window.__helmetFixture = true;' }
+	],
+	jsonLd: {
+		'@type': 'WebSite',
+		name: 'Fixture </script>'
+	}
+}
+---
+
+<html lang="en">
+	<Helmet headItems={headItems} options={{ csp: true }} />
+	<body>
+		<h1 class="fixture-title">Astro Helmet Fixture</h1>
+	</body>
+</html>

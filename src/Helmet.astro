@@ -10,7 +10,7 @@ interface Props {
 	}
 }
 
-const { headItems, options = {} } = Astro.props
+const { headItems, options = {} } = Astro.props as Props
 const { applyPriority, omitHeadTags = false, csp: cspEnabled = false } = options
 const head = renderHead(headItems, applyPriority)
 
@@ -24,8 +24,8 @@ const csp = cspEnabled
 			csp?: {
 				insertScriptHash(hash: string): void
 				insertStyleHash(hash: string): void
-				insertScriptResource(url: string): void
-				insertStyleResource(url: string): void
+				insertScriptResource(resource: string): void
+				insertStyleResource(resource: string): void
 			}
 		}).csp
 	: undefined
@@ -41,8 +41,27 @@ if (csp) {
 	}
 
 	for (const { type, url } of getExternalResources(headItems)) {
-		if (type === 'script') csp.insertScriptResource(url)
-		else csp.insertStyleResource(url)
+		const resource = getCspSource(url)
+		if (!resource) continue
+		if (type === 'script') csp.insertScriptResource(resource)
+		else csp.insertStyleResource(resource)
+	}
+}
+
+function getCspSource(url: string): string | undefined {
+	const trimmed = url.trim()
+	if (!trimmed) return undefined
+	if (trimmed.startsWith('//')) return new URL(`https:${trimmed}`).origin
+	if (trimmed.startsWith('/') || trimmed.startsWith('./')) return "'self'"
+
+	try {
+		const parsed = new URL(trimmed)
+		if (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+			return parsed.origin
+		if (parsed.protocol === 'data:' || parsed.protocol === 'blob:')
+			return parsed.protocol
+	} catch {
+		return "'self'"
 	}
 }
 ---

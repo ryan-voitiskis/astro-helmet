@@ -75,7 +75,7 @@ export function renderHead(
 	const tags: Tag[] = Object.entries(rest).flatMap(([tagName, tagItems]) =>
 		tagItems.map((item) => ({ ...item, tagName }) as Tag)
 	)
-	tags.push({ tagName: 'title', innerHTML: items.title })
+	tags.push({ tagName: 'title', innerHTML: escapeHtml(items.title) })
 	tags.push(...getDefaultTags(tags))
 
 	for (const item of items.jsonLd) {
@@ -244,31 +244,34 @@ function escapeJsonLd(json: string): string {
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
-	const keyless: BaseItem[] = []
-	const metaMap = new Map<string, BaseItem[]>()
+	const deduplicated: BaseItem[] = []
+	const itemIndexByKey = new Map<string, number>()
 
 	for (const meta of metaItems) {
-		const key = meta.property || meta.name || meta['http-equiv'] || (meta.charset ? 'charset' : null)
-		if (key) metaMap.set(key, (metaMap.get(key) || []).concat(meta))
-		else keyless.push(meta)
+		const key = getMetaDeduplicationKey(meta)
+		if (!key) {
+			deduplicated.push(meta)
+			continue
+		}
+
+		const existingIndex = itemIndexByKey.get(key)
+		if (existingIndex === undefined) {
+			itemIndexByKey.set(key, deduplicated.length)
+			deduplicated.push(meta)
+		} else {
+			deduplicated[existingIndex] = meta
+		}
 	}
 
-	return [
-		...keyless,
-		...Array.from(metaMap.values()).flatMap(deduplicateByMedia)
-	]
+	return deduplicated
 }
 
-function deduplicateByMedia(items: BaseItem[]): BaseItem[] {
-	if (items.length === 1) return items
-
-	const uniqueItems = new Map<string, BaseItem>()
-	items.forEach((item) => {
-		const mediaKey = item.media || ''
-		uniqueItems.set(mediaKey, item)
-	})
-
-	return Array.from(uniqueItems.values())
+function getMetaDeduplicationKey(meta: BaseItem): string | undefined {
+	const media = String(meta.media || '')
+	if (meta.property) return `property:${meta.property}:${media}`
+	if (meta.name) return `name:${meta.name}:${media}`
+	if (meta['http-equiv']) return `http-equiv:${meta['http-equiv']}:${media}`
+	if (meta.charset) return `charset::${media}`
 }
 
 function renderHeadTag(item: BaseItem | ContentItem): string {
@@ -283,6 +286,7 @@ function renderHeadTag(item: BaseItem | ContentItem): string {
 export function renderAttrs(item: BaseItem | ContentItem): string {
 	return Object.entries(item)
 		.filter(([key]) => !['innerHTML', 'priority', 'tagName'].includes(key))
+		.filter(([key]) => isValidAttributeName(key))
 		.map(([key, value]) => {
 			if (typeof value === 'boolean') return value ? key : ''
 			else if (value === null || value === undefined) return ''
@@ -290,6 +294,10 @@ export function renderAttrs(item: BaseItem | ContentItem): string {
 		})
 		.filter((attr) => attr !== '')
 		.join(' ')
+}
+
+function isValidAttributeName(key: string): boolean {
+	return /^[^\s"'<>/=]+$/.test(key)
 }
 
 function escapeHtml(str: string): string {
