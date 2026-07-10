@@ -75,13 +75,16 @@ describe('public declarations', () => {
 				`
 					import {
 						createSeoHead,
+						modulepreload,
 						preconnect,
+						preload,
 						preloadFont,
 						preloadImage,
 						validateHeadItems,
 						type HeadItems,
 						type HeadValidationIssue,
-						type HelmetOptions
+						type HelmetOptions,
+						type ModulePreloadOptions
 					} from 'astro-helmet'
 
 					const headItems: HeadItems = createSeoHead({
@@ -113,6 +116,12 @@ describe('public declarations', () => {
 							requireSri: true
 						}
 					}
+					const moduleOptions: ModulePreloadOptions = { as: 'style' }
+					headItems.link.push(modulepreload('/styles.css', moduleOptions))
+					// @ts-expect-error image is not a module preload destination
+					modulepreload('/image.png', { as: 'image' })
+					// @ts-expect-error video is not a standard preload destination
+					preload('/movie.mp4', { as: 'video' })
 					const validationOptions = typeof options.validate === 'object' ? options.validate : undefined
 					const issues: HeadValidationIssue[] = validateHeadItems(headItems, validationOptions)
 					void issues

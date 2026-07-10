@@ -44,7 +44,7 @@ describe('Astro 7 build fixture', () => {
 			const inlineScript = 'window.__helmetFixture = true;'
 			const inlineStyle = '.fixture-title { color: rebeccapurple; }'
 			const jsonLd =
-				'{"@type":"WebSite","name":"Fixture <\\/script>","@context":"https://schema.org"}'
+				'{"@type":"WebSite","name":"Fixture \\u003c/script>","@context":"https://schema.org"}'
 
 			expect(html).toContain('<title>Astro Helmet Fixture</title>')
 			expect(html).toContain(
@@ -68,7 +68,8 @@ describe('Astro 7 build fixture', () => {
 				'https://cdn.example.com/critical.css',
 				'https://cdn.example.com/runtime.js',
 				'https://cdn.example.com/app.js',
-				'https://cdn.example.com/module.js'
+				'https://cdn.example.com/module.js',
+				'https://modules.example.com/theme.css'
 			]) {
 				expect(html).toContain(renderedResource)
 			}
@@ -78,6 +79,10 @@ describe('Astro 7 build fixture', () => {
 			)?.[1]
 			expect(cspContent).toContain('script-src https://cdn.example.com')
 			expect(cspContent).toContain('style-src https://cdn.example.com')
+			expect(cspContent).toContain('https://modules.example.com')
+			expect(cspContent?.match(/script-src[^;]*/)?.[0]).not.toContain(
+				'https://modules.example.com'
+			)
 			expect(cspContent).not.toContain('https://cdn.example.com/runtime.js')
 			expect(cspContent).not.toContain('https://cdn.example.com/site.css')
 			expect(cspContent).not.toContain('https://cdn.example.com/module.js')

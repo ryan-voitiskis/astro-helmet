@@ -16,6 +16,15 @@ describe('validateHeadItems', () => {
 		).toEqual([])
 	})
 
+	it('Treats empty descriptions as missing', () => {
+		expect(
+			codes({
+				title: 'Empty description',
+				meta: [{ name: 'description', content: '   ' }]
+			})
+		).toEqual(['missing-description'])
+	})
+
 	it('Warns for relative and noindex canonical links after deduplication', () => {
 		const result = codes({
 			title: 'Canonical',
@@ -43,6 +52,22 @@ describe('validateHeadItems', () => {
 		expect(result).toEqual([])
 	})
 
+	it('Rejects empty and non-HTTP canonical URLs', () => {
+		const empty = codes({
+			title: 'Empty canonical',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [{ rel: 'canonical', href: '' }]
+		})
+		const data = codes({
+			title: 'Data canonical',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [{ rel: 'canonical', href: 'data:text/html,not-a-page' }]
+		})
+
+		expect(empty).toEqual(['invalid-url'])
+		expect(data).toEqual(['invalid-url'])
+	})
+
 	it('Warns for preload and connection-hint mistakes', () => {
 		const result = codes({
 			title: 'Hints',
@@ -53,7 +78,7 @@ describe('validateHeadItems', () => {
 				{ rel: 'preload', href: '/asset' },
 				{ rel: 'preload', href: '/asset', as: 'invalid' },
 				{ rel: 'preload', href: '/font.woff2', as: 'font' },
-				{ rel: 'modulepreload', href: '/entry.js', as: 'script' }
+				{ rel: 'modulepreload', href: '/entry.js', as: 'image' }
 			]
 		})
 		expect(result).toEqual([
@@ -62,8 +87,43 @@ describe('validateHeadItems', () => {
 			'missing-preload-as',
 			'invalid-preload-as',
 			'font-preload-missing-crossorigin',
-			'modulepreload-with-as'
+			'invalid-modulepreload-as'
 		])
+	})
+
+	it('Accepts only standard preload destinations', () => {
+		const result = codes({
+			title: 'Preload destinations',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [
+				{ rel: 'preload', href: '/audio', as: 'audio' },
+				{ rel: 'preload', href: '/document', as: 'document' },
+				{ rel: 'preload', href: '/embed', as: 'embed' },
+				{ rel: 'preload', href: '/object', as: 'object' },
+				{ rel: 'preload', href: '/provider', as: 'provider' },
+				{ rel: 'preload', href: '/video', as: 'video' },
+				{ rel: 'preload', href: '/worker', as: 'worker' }
+			]
+		})
+
+		expect(result).toEqual(Array(7).fill('invalid-preload-as'))
+	})
+
+	it('Allows standard modulepreload destinations', () => {
+		const result = codes({
+			title: 'Module preload destinations',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [
+				{ rel: 'modulepreload', href: '/default.js' },
+				{ rel: 'modulepreload', href: '/script.js', as: 'script' },
+				{ rel: 'modulepreload', href: '/style.css', as: 'style' },
+				{ rel: 'modulepreload', href: '/data.json', as: 'json' },
+				{ rel: 'modulepreload', href: '/text.txt', as: 'text' },
+				{ rel: 'modulepreload', href: '/worker.js', as: 'worker' }
+			]
+		})
+
+		expect(result).toEqual([])
 	})
 
 	it('Allows href-less responsive image preloads with imagesrcset', () => {
@@ -147,20 +207,37 @@ describe('validateHeadItems', () => {
 		expect(result).toEqual([])
 	})
 
-	it('Warns for trusted raw HTML and inline event attributes', () => {
+	it('Warns once for trusted raw HTML and inline event attributes', () => {
 		const result = codes({
 			title: 'Unsafe',
 			meta: [{ name: 'description', content: 'Description' }],
 			link: [{ rel: 'preconnect', href: 'https://example.com', onload: 'x()' }],
-			script: [{ innerHTML: 'alert(1)' }],
+			script: [{ innerHTML: 'alert(1)', onload: 'x()' }],
 			style: [{ innerHTML: 'body{}' }],
 			noscript: [{ innerHTML: '<p>Enable JS</p>' }]
 		})
 		expect(result).toEqual([
 			'unsafe-event-attribute',
 			'unsafe-inner-html',
+			'unsafe-event-attribute',
 			'unsafe-inner-html',
 			'unsafe-inner-html'
+		])
+	})
+
+	it('Rejects script text that can enter the double-escaped parser state', () => {
+		const result = validateHeadItems({
+			title: 'Unsafe script text',
+			meta: [{ name: 'description', content: 'Description' }],
+			script: [{ textContent: 'console.log("<!--<script>")' }]
+		})
+
+		expect(result).toEqual([
+			expect.objectContaining({
+				code: 'unsafe-script-text',
+				severity: 'error',
+				path: 'script[0]'
+			})
 		])
 	})
 
@@ -226,6 +303,24 @@ describe('validateHeadItems', () => {
 		expect(result).toEqual([])
 	})
 
+	it('Treats empty required Open Graph values as missing', () => {
+		const result = codes({
+			title: 'Empty Open Graph',
+			meta: [
+				{ name: 'description', content: 'Description' },
+				{ property: 'og:title', content: '' },
+				{ property: 'og:type', content: '   ' },
+				{ property: 'og:url', content: '' }
+			]
+		})
+
+		expect(result).toEqual([
+			'missing-og-required',
+			'missing-og-required',
+			'missing-og-required'
+		])
+	})
+
 	it('Allows layout-level og:type without requiring page Open Graph tags', () => {
 		const result = codes({
 			title: 'Layout only',
@@ -235,6 +330,22 @@ describe('validateHeadItems', () => {
 			]
 		})
 		expect(result).toEqual([])
+	})
+
+	it('Rejects an empty layout-level og:type', () => {
+		const result = codes({
+			title: 'Empty layout type',
+			meta: [
+				{ name: 'description', content: 'Description' },
+				{ property: 'og:type', content: '' }
+			]
+		})
+
+		expect(result).toEqual([
+			'missing-og-required',
+			'missing-og-required',
+			'missing-og-required'
+		])
 	})
 
 	it('Can require Open Graph images for stricter previews', () => {

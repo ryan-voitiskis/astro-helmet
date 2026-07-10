@@ -83,6 +83,27 @@ describe('getExternalResources', () => {
 		])
 	})
 
+	it('Classifies standard modulepreload destinations for CSP registration', () => {
+		const params: HeadItems = {
+			title: 'Test',
+			link: [
+				{ rel: 'modulepreload', href: '/default.js' },
+				{ rel: 'modulepreload', href: '/script.js', as: 'script' },
+				{ rel: 'modulepreload', href: '/worker.js', as: 'worker' },
+				{ rel: 'modulepreload', href: '/style.css', as: 'style' },
+				{ rel: 'modulepreload', href: '/data.json', as: 'json' },
+				{ rel: 'modulepreload', href: '/text.txt', as: 'text' }
+			]
+		}
+
+		expect(getExternalResources(params)).toEqual([
+			{ type: 'script', url: '/default.js' },
+			{ type: 'script', url: '/script.js' },
+			{ type: 'script', url: '/worker.js' },
+			{ type: 'style', url: '/style.css' }
+		])
+	})
+
 	it('Matches rel and as values case-insensitively', () => {
 		const params: HeadItems = {
 			title: 'Test',

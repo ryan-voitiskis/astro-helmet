@@ -5,18 +5,32 @@ const DEFAULT_VIEWPORT = {
 }
 
 const VALID_PRELOAD_AS_VALUES = new Set([
-	'audio',
-	'document',
-	'embed',
 	'fetch',
 	'font',
 	'image',
-	'object',
-	'provider',
 	'script',
 	'style',
-	'track',
-	'video',
+	'track'
+])
+
+const VALID_MODULE_PRELOAD_AS_VALUES = new Set([
+	'audioworklet',
+	'json',
+	'paintworklet',
+	'script',
+	'serviceworker',
+	'sharedworker',
+	'style',
+	'text',
+	'worker'
+])
+
+const SCRIPT_LIKE_MODULE_PRELOAD_AS_VALUES = new Set([
+	'audioworklet',
+	'paintworklet',
+	'script',
+	'serviceworker',
+	'sharedworker',
 	'worker'
 ])
 
@@ -45,6 +59,20 @@ export type HelmetOptions = {
 export type CrossOrigin = 'anonymous' | 'use-credentials' | ''
 
 export type FetchPriority = 'high' | 'low' | 'auto'
+
+export type ModulePreloadAs =
+	| 'audioworklet'
+	| 'json'
+	| 'paintworklet'
+	| 'script'
+	| 'serviceworker'
+	| 'sharedworker'
+	| 'style'
+	| 'text'
+	| 'worker'
+
+export type PreloadAs =
+	'fetch' | 'font' | 'image' | 'script' | 'style' | 'track'
 
 export type ReferrerPolicy =
 	| 'no-referrer'
@@ -103,7 +131,6 @@ export type HeadValidationSeverity = 'warning' | 'error'
 export type HeadValidationCode =
 	| 'missing-title'
 	| 'missing-description'
-	| 'duplicate-canonical'
 	| 'relative-canonical'
 	| 'canonical-with-noindex'
 	| 'invalid-url'
@@ -112,12 +139,13 @@ export type HeadValidationCode =
 	| 'missing-preload-as'
 	| 'responsive-image-missing-sizes'
 	| 'font-preload-missing-crossorigin'
-	| 'modulepreload-with-as'
+	| 'invalid-modulepreload-as'
 	| 'preconnect-missing-href'
 	| 'dns-prefetch-missing-href'
 	| 'sri-missing-crossorigin'
 	| 'missing-sri'
 	| 'unsafe-inner-html'
+	| 'unsafe-script-text'
 	| 'unsafe-event-attribute'
 	| 'missing-og-required'
 	| 'relative-og-url'
@@ -147,7 +175,11 @@ export type ResourceHintOptions = Omit<LinkItem, 'rel' | 'href' | 'as'> & {
 }
 
 export type PreloadOptions = ResourceHintOptions & {
-	as: string
+	as: PreloadAs
+}
+
+export type ModulePreloadOptions = ResourceHintOptions & {
+	as?: ModulePreloadAs
 }
 
 export type PreloadFontOptions = ResourceHintOptions & {
@@ -465,7 +497,11 @@ export function getExternalResources(
 		if (hasRel(link, 'stylesheet') && link.href)
 			result.push({ type: 'style', url: toUrlString(link.href) })
 		else if (hasRel(link, 'modulepreload') && link.href) {
-			result.push({ type: 'script', url: toUrlString(link.href) })
+			const as = normaliseAttrValue(link.as).toLowerCase() || 'script'
+			if (as === 'style')
+				result.push({ type: 'style', url: toUrlString(link.href) })
+			else if (SCRIPT_LIKE_MODULE_PRELOAD_AS_VALUES.has(as))
+				result.push({ type: 'script', url: toUrlString(link.href) })
 		} else if (hasRel(link, 'preload') && link.href) {
 			if (attrEquals(link.as, 'script'))
 				result.push({ type: 'script', url: toUrlString(link.href) })
@@ -538,7 +574,7 @@ export function preloadImage(
 
 export function modulepreload(
 	href: string | URL,
-	options: ResourceHintOptions = {}
+	options: ModulePreloadOptions = {}
 ): LinkItem {
 	return { ...options, rel: 'modulepreload', href: toUrlString(href) }
 }
@@ -658,7 +694,10 @@ export function validateHeadItems(
 
 	if (
 		validationOptions.requireDescription &&
-		!items.meta.some((meta) => attrEquals(meta.name, 'description'))
+		!items.meta.some(
+			(meta) =>
+				attrEquals(meta.name, 'description') && hasNonEmptyAttr(meta, 'content')
+		)
 	) {
 		issues.push({
 			code: 'missing-description',
@@ -687,6 +726,7 @@ function validateMetaItems(
 	options: HeadValidationOptions
 ): void {
 	const ogProperties = new Set<string>()
+	const populatedOgProperties = new Set<string>()
 
 	metaItems.forEach((meta, index) => {
 		validateUnsafeAttributes(meta, 'meta', `meta[${index}]`, issues, options)
@@ -694,7 +734,10 @@ function validateMetaItems(
 		const name = normaliseAttrValue(meta.name).toLowerCase()
 		const content = normaliseAttrValue(meta.content)
 
-		if (property.startsWith('og:')) ogProperties.add(property)
+		if (property.startsWith('og:')) {
+			ogProperties.add(property)
+			if (content) populatedOgProperties.add(property)
+		}
 
 		const ogUrlValid =
 			property === 'og:url'
@@ -748,7 +791,8 @@ function validateMetaItems(
 
 	const hasActiveOpenGraph =
 		ogProperties.size > 1 ||
-		[...ogProperties].some((property) => property !== 'og:type')
+		[...ogProperties].some((property) => property !== 'og:type') ||
+		(ogProperties.has('og:type') && !populatedOgProperties.has('og:type'))
 
 	if (hasActiveOpenGraph) {
 		const requiredProperties = [
@@ -758,7 +802,7 @@ function validateMetaItems(
 			...(options.requireOpenGraphImage ? ['og:image'] : [])
 		]
 		for (const property of requiredProperties) {
-			if (!ogProperties.has(property)) {
+			if (!populatedOgProperties.has(property)) {
 				issues.push({
 					code: 'missing-og-required',
 					severity: 'warning',
@@ -777,8 +821,6 @@ function validateLinkItems(
 	options: HeadValidationOptions,
 	hasNoindex: boolean
 ): void {
-	let canonicalCount = 0
-
 	linkItems.forEach((link, index) => {
 		validateUnsafeAttributes(link, 'link', `link[${index}]`, issues, options)
 		const rels = getRelTokens(link)
@@ -786,16 +828,33 @@ function validateLinkItems(
 		const path = `link[${index}]`
 
 		if (rels.includes('canonical')) {
-			canonicalCount += 1
-			const hrefValid = validateUrlValue(href, 'link', path, issues, options)
-			if (href && hrefValid && isRelativeUrl(href)) {
+			if (!href) {
 				issues.push({
-					code: 'relative-canonical',
+					code: 'invalid-url',
 					severity: 'warning',
 					tagName: 'link',
 					path,
-					message: 'Canonical links should be absolute URLs.'
+					message: 'Canonical links need a non-empty absolute HTTP(S) URL.'
 				})
+			} else {
+				const hrefValid = validateUrlValue(href, 'link', path, issues, options)
+				if (hrefValid && isRelativeUrl(href)) {
+					issues.push({
+						code: 'relative-canonical',
+						severity: 'warning',
+						tagName: 'link',
+						path,
+						message: 'Canonical links should be absolute URLs.'
+					})
+				} else if (hrefValid && !isAbsoluteHttpUrl(href)) {
+					issues.push({
+						code: 'invalid-url',
+						severity: 'warning',
+						tagName: 'link',
+						path,
+						message: 'Canonical links must use an absolute HTTP(S) URL.'
+					})
+				}
 			}
 
 			if (hasNoindex) {
@@ -832,13 +891,16 @@ function validateLinkItems(
 		if (rels.includes('preload')) validatePreload(link, issues, path)
 
 		if (rels.includes('modulepreload') && hasNonEmptyAttr(link, 'as')) {
-			issues.push({
-				code: 'modulepreload-with-as',
-				severity: 'warning',
-				tagName: 'link',
-				path,
-				message: 'modulepreload does not use an as attribute.'
-			})
+			const as = normaliseAttrValue(link.as).toLowerCase()
+			if (!VALID_MODULE_PRELOAD_AS_VALUES.has(as)) {
+				issues.push({
+					code: 'invalid-modulepreload-as',
+					severity: 'warning',
+					tagName: 'link',
+					path,
+					message: `modulepreload as="${as}" is not a standard destination.`
+				})
+			}
 		}
 
 		validateSubresourceIntegrity(
@@ -850,16 +912,6 @@ function validateLinkItems(
 			isSriRelevantLink(link)
 		)
 	})
-
-	if (canonicalCount > 1) {
-		issues.push({
-			code: 'duplicate-canonical',
-			severity: 'warning',
-			tagName: 'link',
-			path: 'link[rel="canonical"]',
-			message: 'Multiple canonical links were provided; the last one wins.'
-		})
-	}
 }
 
 function validatePreload(
@@ -937,7 +989,6 @@ function validateScriptItems(
 ): void {
 	scriptItems.forEach((script, index) => {
 		const path = `script[${index}]`
-		validateUnsafeAttributes(script, 'script', path, issues, options)
 		validateSubresourceIntegrity(script, 'script', path, issues, options, true)
 	})
 }
@@ -951,6 +1002,20 @@ function validateContentItems(
 	items.forEach((item, index) => {
 		const path = `${tagName}[${index}]`
 		validateUnsafeAttributes(item, tagName, path, issues, options)
+		if (
+			tagName === 'script' &&
+			item.textContent !== undefined &&
+			hasUnsafeScriptTextContent(String(item.textContent))
+		) {
+			issues.push({
+				code: 'unsafe-script-text',
+				severity: 'error',
+				tagName,
+				path,
+				message:
+					'script.textContent contains an HTML parser sequence that can consume the rest of the document. Use an external script instead.'
+			})
+		}
 		if (options.warnOnInnerHTML !== false && item.innerHTML !== undefined) {
 			issues.push({
 				code: 'unsafe-inner-html',
@@ -1342,6 +1407,15 @@ function isRelativeUrl(value: string): boolean {
 	}
 }
 
+function isAbsoluteHttpUrl(value: string): boolean {
+	try {
+		const url = new URL(value)
+		return url.protocol === 'http:' || url.protocol === 'https:'
+	} catch {
+		return false
+	}
+}
+
 function isExternalHttpUrl(value: string, baseUrl?: string | URL): boolean {
 	let url: URL
 	try {
@@ -1361,7 +1435,7 @@ function isExternalHttpUrl(value: string, baseUrl?: string | URL): boolean {
 }
 
 function escapeJsonLd(json: string): string {
-	return json.replace(/<\//gi, '<\\/')
+	return json.replace(/</g, '\\u003c')
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
@@ -1526,7 +1600,16 @@ function getTagContent(item: BaseItem | ContentItem): string {
 }
 
 function escapeRawText(content: string, tagName: 'script' | 'style'): string {
+	if (tagName === 'script' && hasUnsafeScriptTextContent(content)) {
+		throw new Error(
+			'script.textContent contains an HTML parser sequence that can consume the rest of the document. Use an external script or trusted innerHTML instead.'
+		)
+	}
 	return content.replace(new RegExp(`</${tagName}`, 'gi'), `<\\/${tagName}`)
+}
+
+function hasUnsafeScriptTextContent(content: string): boolean {
+	return /<!--[\s\S]*<script(?=[\t\n\f />])/i.test(content)
 }
 
 function hasAttr(item: BaseItem | ContentItem, key: string): boolean {

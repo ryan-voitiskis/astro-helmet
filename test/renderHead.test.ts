@@ -737,7 +737,7 @@ describe('JSON-LD', () => {
 		expect(jsonLdTags[1]).toContain('"@type":"BreadcrumbList"')
 	})
 
-	it('Value containing </script> is escaped to <\\/script>', () => {
+	it('Escapes less-than characters in JSON-LD values', () => {
 		const params: HeadItems = {
 			title: 'My Article',
 			jsonLd: {
@@ -747,10 +747,10 @@ describe('JSON-LD', () => {
 		}
 		const result = renderHead(params)
 		expect(result).not.toContain('</script><script>')
-		expect(result).toContain('<\\/script>')
+		expect(result).toContain('\\u003c/script>\\u003cscript>')
 	})
 
-	it('Escapes mixed-case </script> in JSON-LD values', () => {
+	it('Escapes mixed-case closing tags in JSON-LD values', () => {
 		const params: HeadItems = {
 			title: 'My Article',
 			jsonLd: {
@@ -760,7 +760,26 @@ describe('JSON-LD', () => {
 		}
 		const result = renderHead(params)
 		expect(result).not.toContain('</SCRIPT>')
-		expect(result).toContain('<\\/SCRIPT>')
+		expect(result).toContain('\\u003c/SCRIPT>')
+	})
+
+	it('Escapes script double-escape sequences in JSON-LD values', () => {
+		const result = renderHead({
+			title: 'Parser-safe JSON-LD',
+			jsonLd: { '@type': 'Thing', name: '<!--<script>' }
+		})
+
+		expect(result).not.toContain('<!--<script>')
+		expect(result).toContain('\\u003c!--\\u003cscript>')
+	})
+
+	it('Rejects script textContent that can enter a double-escaped parser state', () => {
+		expect(() =>
+			renderHead({
+				title: 'Unsafe script text',
+				script: [{ textContent: 'console.log("<!--<script>")' }]
+			})
+		).toThrow(/HTML parser sequence/)
 	})
 
 	it('Array merge from HeadItems[] concatenates JSON-LD blocks', () => {
@@ -854,7 +873,7 @@ describe('JSON-LD', () => {
 		expect(result).not.toContain('evil.com')
 	})
 
-	it('Escapes </script> in nested object values', () => {
+	it('Escapes less-than characters in nested object values', () => {
 		const params: HeadItems = {
 			title: 'Test',
 			jsonLd: {
@@ -867,7 +886,7 @@ describe('JSON-LD', () => {
 		}
 		const result = renderHead(params)
 		expect(result).not.toContain('</script><script>')
-		expect(result).toContain('<\\/script>')
+		expect(result).toContain('\\u003c/script>\\u003cscript>')
 	})
 
 	it('No extra script tags when jsonLd is not provided', () => {
