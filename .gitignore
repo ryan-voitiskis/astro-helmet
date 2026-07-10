@@ -15,6 +15,12 @@ pnpm-debug.log*
 # coverage
 coverage/
 
+# browser test output
+.playwright-cli/
+blob-report/
+playwright-report/
+test-results/
+
 # environment variables
 .env
 .env.production

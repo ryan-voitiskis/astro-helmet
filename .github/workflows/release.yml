@@ -23,20 +23,17 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npx prettier --check .
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test -- --run
+      - run: npm run coverage
 
-  consumer-matrix:
-    name: Astro ${{ matrix.astro }} Consumer
+  browser:
+    name: Browser parser safety
     runs-on: ubuntu-latest
     needs: ci
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        astro: [4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,9 +41,62 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:browser
+
+  package-artifact:
+    name: Package artifact
+    runs-on: ubuntu-latest
+    needs: ci
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:package
+      - run: npm pack --dry-run
+      - name: Prepare unique publish dry-run version
+        run: npm version "0.0.0-release-check.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" --no-git-tag-version
+      - run: npm publish --dry-run --tag beta --provenance
+
+  consumer-matrix:
+    name: Astro ${{ matrix.astro }} / Node ${{ matrix.node }} / TS ${{ matrix.typescript }}
+    runs-on: ubuntu-latest
+    needs: ci
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - astro: 4
+            node: 18.17.1
+            typescript: 5.9.3
+          - astro: 5
+            node: 18.20.8
+            typescript: 5.9.3
+          - astro: 6
+            node: 22.12.0
+            typescript: 6.0.3
+          - astro: 7
+            node: 22.12.0
+            typescript: 6.0.3
+          - astro: 7
+            node: 24
+            typescript: 6.0.3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
       - name: Build packed package in Astro consumer
         env:
           ASTRO_VERSION: ${{ matrix.astro }}
+          TYPESCRIPT_VERSION: ${{ matrix.typescript }}
         run: |
           set -euo pipefail
 
@@ -56,16 +106,40 @@ jobs:
           mkdir -p "$APP_DIR/src/pages"
           cd "$APP_DIR"
           npm init -y >/dev/null
-          npm install --silent "astro@$ASTRO_VERSION" "$TARBALL_PATH" typescript@6.0.3
+          npm install --silent "astro@$ASTRO_VERSION" "$TARBALL_PATH" "typescript@$TYPESCRIPT_VERSION"
+
+          if [ "$ASTRO_VERSION" -ge 6 ]; then
+            CSP_ENABLED=true
+            cat > astro.config.mjs <<'EOF'
+          import { defineConfig } from 'astro/config'
+
+          export default defineConfig({
+            security: {
+              csp: true
+            }
+          })
+          EOF
+          else
+            CSP_ENABLED=false
+          fi
 
           cat > src/pages/index.astro <<'EOF'
           ---
-          import Helmet, { createSeoHead, preloadFont } from 'astro-helmet'
+          import Helmet, {
+            createSeoHead,
+            modulepreload,
+            preloadFont,
+            preloadImage
+          } from 'astro-helmet'
           import type { HeadItems } from 'astro-helmet'
+
+          const enableCsp = __ENABLE_CSP__
 
           const seoHead = createSeoHead({
             title: 'Consumer Fixture',
             description: 'Packed package consumer fixture',
+            site: 'https://example.com',
+            path: '/fixture',
             openGraph: {
               image: 'https://example.com/og.jpg'
             }
@@ -73,27 +147,45 @@ jobs:
 
           const resourceHead: HeadItems = {
             title: 'Consumer Fixture',
-            link: [preloadFont('/consumer.woff2', { type: 'font/woff2' })],
-            style: [{ innerHTML: '.consumer { color: green; }' }],
-            script: [{ innerHTML: 'window.__consumerFixture = true;' }],
-            jsonLd: { '@type': 'WebSite', name: 'Consumer' }
+            link: [
+              preloadFont('/consumer.woff2', { type: 'font/woff2' }),
+              preloadImage({
+                imagesrcset: '/hero-640.jpg 640w, /hero-1280.jpg 1280w',
+                imagesizes: '100vw',
+                fetchpriority: 'high'
+              }),
+              modulepreload('/consumer.js', { as: 'script' }),
+              modulepreload('/consumer.css', { as: 'style' })
+            ],
+            style: [{ textContent: '.consumer { color: green; }' }],
+            script: [{ textContent: 'window.__consumerFixture = true;' }],
+            jsonLd: { '@type': 'WebSite', name: '<!--<script>' }
           }
           ---
 
           <html lang="en">
-            <Helmet headItems={[seoHead, resourceHead]} options={{ validate: false }} />
-            <body><h1 class="consumer">Consumer Fixture</h1></body>
+            <Helmet
+              headItems={[seoHead, resourceHead]}
+              options={{ csp: enableCsp, validate: false }}
+            />
+            <body><h1 id="after" class="consumer">Consumer Fixture</h1></body>
           </html>
           EOF
+          sed -i.bak "s/__ENABLE_CSP__/$CSP_ENABLED/" src/pages/index.astro
+          rm src/pages/index.astro.bak
 
           cat > type-import.ts <<'EOF'
           import {
             createSeoHead,
+            modulepreload,
             preconnect,
+            preload,
             validateHeadItems,
             type HeadItems,
             type HelmetOptions,
-            type HeadValidationIssue
+            type HeadValidationIssue,
+            type ModulePreloadOptions,
+            type PreloadAs
           } from 'astro-helmet'
 
           const headItems: HeadItems = createSeoHead({
@@ -101,6 +193,10 @@ jobs:
             description: 'Types only description'
           })
           headItems.link = [preconnect('https://example.com')]
+          const moduleOptions: ModulePreloadOptions = { as: 'script' }
+          headItems.link.push(modulepreload('/typed.js', moduleOptions))
+          const preloadAs: PreloadAs = 'script'
+          headItems.link.push(preload('/typed.js', { as: preloadAs }))
           const options: HelmetOptions = { validate: { requireSri: true } }
           const validationOptions = typeof options.validate === 'object' ? options.validate : undefined
           const issues: HeadValidationIssue[] = validateHeadItems(headItems, validationOptions)
@@ -114,11 +210,27 @@ jobs:
           fi
 
           npx tsc --noEmit --module NodeNext --moduleResolution NodeNext --target ES2022 --strict type-import.ts
+          npx tsc --noEmit --module ESNext --moduleResolution Bundler --target ES2022 --strict type-import.ts
+
+          grep -q '<link rel="canonical" href="https://example.com/fixture">' dist/index.html
+          grep -q '<meta name="description" content="Packed package consumer fixture">' dist/index.html
+          grep -q 'imagesrcset="/hero-640.jpg 640w, /hero-1280.jpg 1280w"' dist/index.html
+          grep -q 'fetchpriority="high"' dist/index.html
+          grep -q 'rel="modulepreload"' dist/index.html
+          grep -q '\\u003c!--\\u003cscript>' dist/index.html
+          grep -q 'id="after"' dist/index.html
+          if grep -q '<!--<script>' dist/index.html; then
+            echo 'Unsafe JSON-LD parser sequence reached built HTML'
+            exit 1
+          fi
+          if [ "$ASTRO_VERSION" -ge 6 ]; then
+            grep -q 'http-equiv="content-security-policy"' dist/index.html
+          fi
 
   release:
     name: Release
     if: github.event_name == 'push'
-    needs: [ci, consumer-matrix]
+    needs: [ci, browser, package-artifact, consumer-matrix]
     runs-on: ubuntu-latest
     permissions:
       contents: write

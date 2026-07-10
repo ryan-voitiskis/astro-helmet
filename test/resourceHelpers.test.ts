@@ -36,6 +36,11 @@ describe('resource helpers', () => {
 			rel: 'modulepreload',
 			href: '/entry.js'
 		})
+		expect(modulepreload('/styles.css', { as: 'style' })).toEqual({
+			as: 'style',
+			rel: 'modulepreload',
+			href: '/styles.css'
+		})
 		expect(stylesheet('/site.css', { media: 'screen' })).toEqual({
 			rel: 'stylesheet',
 			href: '/site.css',

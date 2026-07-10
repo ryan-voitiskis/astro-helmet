@@ -60,7 +60,7 @@ Any attribute can be added to a head item. Simply provide the attribute as a key
 
 `'innerHTML', 'textContent', 'priority', 'tagName', 'key'` are reserved keys and cannot be used as attributes.
 
-To add content to a tag, prefer `textContent`. For `<script>` and `<style>`, `textContent` preserves the code text while escaping closing-tag sequences such as `</script>`. For tags like `<noscript>`, `textContent` is HTML-escaped.
+To add content to a tag, prefer `textContent`. For `<script>` and `<style>`, `textContent` preserves the code text while escaping closing-tag sequences such as `</script>`. Script text that contains the HTML parser sequence `<!--` followed by `<script>` is rejected because it can consume the rest of the document; use an external script instead. For tags like `<noscript>`, `textContent` is HTML-escaped.
 
 Use `innerHTML` only when you intentionally need raw, trusted markup. Do not pass CMS or user-provided strings into `innerHTML` or inline event-handler attributes.
 
@@ -78,6 +78,8 @@ See `applyPriority()` in the [Options](#options) section for more information on
 ### Resource Helpers
 
 Resource helpers return ordinary `link` or `script` items. They are optional, but they make common performance-sensitive tags harder to mistype.
+
+`modulepreload()` accepts the standardized `as` destinations. Browser support beyond the default JavaScript module destination is still emerging, so verify non-script module types in your target browsers.
 
 ```ts
 import {
@@ -209,7 +211,7 @@ const headItems: HeadItems = {
 
 ### JSON-LD / Structured Data
 
-Use the `jsonLd` property to add [JSON-LD structured data](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data) to your pages. `@context` is set to `https://schema.org` automatically, `JSON.stringify()` is handled internally, and `</script>` sequences in values are escaped.
+Use the `jsonLd` property to add [JSON-LD structured data](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data) to your pages. `@context` is set to `https://schema.org` automatically, `JSON.stringify()` is handled internally, and less-than characters in values are escaped as JSON Unicode sequences so embedded data cannot change the HTML parser state.
 
 ```ts
 const headItems: HeadItems = {
@@ -344,7 +346,7 @@ const issues = validateHeadItems(headItems, {
 })
 ```
 
-Validation returns structured issues with `code`, `severity`, `message`, `tagName`, and `path`. It checks for common mistakes such as missing titles/descriptions, duplicate or relative canonicals, invalid preloads, preloads without a usable source, responsive image preloads that use width descriptors without `imagesizes`, font preloads without `crossorigin`, incomplete Open Graph basics, relative Open Graph/Twitter image URLs, raw `innerHTML`, inline event attributes, JSON-LD serialization errors, and optional missing SRI on external scripts/styles.
+Validation returns structured issues with `code`, `severity`, `message`, `tagName`, and `path`. It checks for common mistakes such as missing or empty titles/descriptions, empty or relative canonicals, invalid preload and module-preload destinations, preloads without a usable source, responsive image preloads that use width descriptors without `imagesizes`, font preloads without `crossorigin`, incomplete or empty Open Graph basics, relative Open Graph/Twitter image URLs, raw `innerHTML`, unsafe script parser sequences, inline event attributes, JSON-LD serialization errors, and optional missing SRI on external scripts/styles.
 
 Set `requireOpenGraphImage: true` if every shareable page in your project should provide `og:image`. By default, image-less website pages are allowed so dev validation does not warn on simple pages that still have useful `og:title`, `og:type`, and `og:url` tags.
 
@@ -428,7 +430,7 @@ Astro CSP is available in Astro 6 and newer. In Astro 4 and 5 this option is a n
 - External `<script src>`.
 - Stylesheet links.
 - `rel="preload"` links with `as="script"` or `as="style"`.
-- `rel="modulepreload"` links as script resources.
+- `rel="modulepreload"` links with script-like destinations as script resources and `as="style"` as a style resource. JSON and text module destinations are not registered because Astro's helper API does not expose their `connect-src` directives.
 
 It does not infer broader CSP directives from icons, images, fonts, analytics endpoints, or connection hints.
 

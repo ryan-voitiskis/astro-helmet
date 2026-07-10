@@ -44,14 +44,33 @@ describe('getInlineContent', () => {
 		expect(result[0].content).toContain('"name":"My Site"')
 	})
 
-	it('Escapes </ in JSON-LD content', () => {
+	it('Escapes less-than characters in JSON-LD content', () => {
 		const params: HeadItems = {
 			title: 'My Site Title',
 			jsonLd: { '@type': 'WebSite', name: '</script>' }
 		}
 		const result = getInlineContent(params)
-		expect(result[0].content).toContain('<\\/script>')
+		expect(result[0].content).toContain('\\u003c/script>')
 		expect(result[0].content).not.toContain('</script>')
+	})
+
+	it('Escapes script double-escape sequences in JSON-LD content', () => {
+		const result = getInlineContent({
+			title: 'Parser-safe JSON-LD',
+			jsonLd: { '@type': 'Thing', name: '<!--<script>' }
+		})
+
+		expect(result[0].content).toContain('\\u003c!--\\u003cscript>')
+		expect(result[0].content).not.toContain('<!--<script>')
+	})
+
+	it('Rejects script textContent that can enter a double-escaped parser state', () => {
+		expect(() =>
+			getInlineContent({
+				title: 'Unsafe script text',
+				script: [{ textContent: 'console.log("<!--<script>")' }]
+			})
+		).toThrow(/HTML parser sequence/)
 	})
 
 	it('Returns multiple JSON-LD items', () => {

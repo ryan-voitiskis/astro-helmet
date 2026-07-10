@@ -8,7 +8,9 @@ export default defineConfig({
 	vite: {
 		resolve: {
 			alias: {
-				'astro-helmet': fileURLToPath(new URL('../../../index.ts', import.meta.url))
+				'astro-helmet': fileURLToPath(
+					new URL('../../../index.ts', import.meta.url)
+				)
 			}
 		}
 	}

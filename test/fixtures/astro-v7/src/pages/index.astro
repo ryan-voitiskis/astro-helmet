@@ -22,7 +22,8 @@ const resourceHead: HeadItems = {
 		stylesheet('https://cdn.example.com/site.css'),
 		preload('https://cdn.example.com/critical.css', { as: 'style' }),
 		preload('https://cdn.example.com/app.js', { as: 'script' }),
-		modulepreload('https://cdn.example.com/module.js')
+		modulepreload('https://cdn.example.com/module.js'),
+		modulepreload('https://modules.example.com/theme.css', { as: 'style' })
 	],
 	style: [{ textContent: '.fixture-title { color: rebeccapurple; }' }],
 	script: [
