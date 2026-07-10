@@ -59,6 +59,8 @@ jobs:
       - run: npm ci
       - run: npm run lint:package
       - run: npm pack --dry-run
+      - name: Prepare unique publish dry-run version
+        run: npm version "0.0.0-release-check.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" --no-git-tag-version
       - run: npm publish --dry-run --tag beta --provenance
 
   consumer-matrix:
