@@ -138,6 +138,7 @@ export type HeadValidationCode =
 	| 'invalid-preload-as'
 	| 'missing-preload-as'
 	| 'responsive-image-missing-sizes'
+	| 'responsive-image-missing-1x'
 	| 'font-preload-missing-crossorigin'
 	| 'invalid-modulepreload-as'
 	| 'preconnect-missing-href'
@@ -971,6 +972,22 @@ function validatePreload(
 		})
 	}
 
+	if (
+		as === 'image' &&
+		!href &&
+		hasDensityDescriptorImageSrcset(imagesrcset) &&
+		!hasOneXImageSrcsetCandidate(imagesrcset)
+	) {
+		issues.push({
+			code: 'responsive-image-missing-1x',
+			severity: 'warning',
+			tagName: 'link',
+			path,
+			message:
+				'Density-descriptor responsive image preloads should include the rendered image src as an explicit 1x candidate when src provides its fallback.'
+		})
+	}
+
 	if (as === 'font' && !hasAttr(link, 'crossorigin')) {
 		issues.push({
 			code: 'font-preload-missing-crossorigin',
@@ -1174,6 +1191,21 @@ function hasWidthDescriptorImageSrcset(imagesrcset: string): boolean {
 	return imagesrcset.split(',').some((candidate) => {
 		const descriptor = candidate.trim().split(/\s+/).at(-1) || ''
 		return /^\d+w$/.test(descriptor)
+	})
+}
+
+function hasDensityDescriptorImageSrcset(imagesrcset: string): boolean {
+	return imagesrcset.split(',').some((candidate) => {
+		const descriptor = candidate.trim().split(/\s+/).at(-1) || ''
+		return /^\d*\.?\d+x$/.test(descriptor)
+	})
+}
+
+function hasOneXImageSrcsetCandidate(imagesrcset: string): boolean {
+	return imagesrcset.split(',').some((candidate) => {
+		const parts = candidate.trim().split(/\s+/)
+		const descriptor = parts.at(-1) || ''
+		return parts.length === 1 || /^(?:1|1\.0+)x$/.test(descriptor)
 	})
 }
 

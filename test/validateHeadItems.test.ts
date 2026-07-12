@@ -178,6 +178,38 @@ describe('validateHeadItems', () => {
 		expect(result).toEqual(['responsive-image-missing-sizes'])
 	})
 
+	it('Warns when an href-less density srcset omits its 1x fallback', () => {
+		const result = codes({
+			title: 'Responsive density preload',
+			meta: [{ name: 'description', content: 'Description' }],
+			link: [
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero@1.5x.jpg 1.5x, /hero@2x.jpg 2x'
+				},
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero.jpg 1.0x, /hero@2x.jpg 2x'
+				},
+				{
+					rel: 'preload',
+					as: 'image',
+					imagesrcset: '/hero.jpg, /hero@2x.jpg 2x'
+				},
+				{
+					rel: 'preload',
+					as: 'image',
+					href: '/hero.jpg',
+					imagesrcset: '/hero@1.5x.jpg 1.5x, /hero@2x.jpg 2x'
+				}
+			]
+		})
+
+		expect(result).toEqual(['responsive-image-missing-1x'])
+	})
+
 	it('Treats empty crossorigin as present for validation', () => {
 		const result = codes({
 			title: 'Crossorigin',

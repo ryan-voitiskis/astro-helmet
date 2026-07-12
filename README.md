@@ -122,6 +122,25 @@ preloadImage({
 
 Use this when you want browsers that support responsive preloads to choose from `imagesrcset` without causing an additional fallback preload in browsers that do not. Width-descriptor `imagesrcset` values such as `640w` should include `imagesizes`; density descriptors such as `1x, 2x` do not need it.
 
+The preload's `imagesrcset` and `imagesizes` must match the rendered `<img>` attributes so the browser can reuse the preload. When an `<img>` uses `src` as the density fallback, include that URL as an explicit `1x` candidate in both source sets:
+
+```ts
+preloadImage({
+  imagesrcset: '/images/hero.jpg 1x, /images/hero@2x.jpg 2x',
+  fetchpriority: 'high'
+})
+```
+
+```html
+<img
+  src="/images/hero.jpg"
+  srcset="/images/hero.jpg 1x, /images/hero@2x.jpg 2x"
+  alt=""
+/>
+```
+
+If the `<img>` instead has `srcset="/images/hero@1.5x.jpg 1.5x, /images/hero@2x.jpg 2x"`, a DPR-1 browser selects the `1.5x` candidate rather than its separate `src`. Preloading `src` in that case will not match the image request.
+
 ### SEO Helper
 
 Use `createSeoHead()` when you want a small typed layer for common SEO tags while still keeping the raw `HeadItems` escape hatch.
