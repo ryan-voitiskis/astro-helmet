@@ -2,9 +2,8 @@
 import {
 	type HeadItems,
 	type HelmetOptions,
-	renderHead,
-	getInlineContent,
-	getExternalResources,
+	prepareHead,
+	getCspSource,
 	validateHeadItems
 } from './main'
 
@@ -18,10 +17,15 @@ const {
 	applyPriority,
 	omitHeadTags = false,
 	csp: cspEnabled = false,
+	baseUrl,
 	validate = import.meta.env.DEV
 } = options
 if (validate) {
-	const validationOptions = typeof validate === 'object' ? validate : undefined
+	const validationOptions = {
+		baseUrl,
+		documentUrl: Astro.url,
+		...(typeof validate === 'object' ? validate : {})
+	}
 	for (const issue of validateHeadItems(headItems, validationOptions)) {
 		console.warn(
 			`[astro-helmet] ${issue.code}: ${issue.message}${
@@ -30,27 +34,32 @@ if (validate) {
 		)
 	}
 }
-const head = renderHead(headItems, applyPriority)
+const head = prepareHead(headItems, applyPriority)
 
 // Register CSP hashes and resources when the consumer opts in via `options.csp`
 // AND is running on Astro 6+ with CSP configured. Reading `Astro.csp` warns in
 // production when CSP isn't configured, so the opt-in keeps the component
 // silent for users who don't need CSP integration. Cast avoids typecheck
 // failures for downstream consumers on Astro 4/5.
-const csp = cspEnabled
-	? (
-			Astro as unknown as {
-				csp?: {
-					insertScriptHash(hash: string): void
-					insertStyleHash(hash: string): void
-					insertScriptResource(resource: string): void
-					insertStyleResource(resource: string): void
+// Astro 5 exposes an experimental API that throws if experimental.csp is off.
+// Check the public generator version before accessing it to keep the documented
+// Astro 4/5 no-op, including when options.csp is explicitly true.
+const astroMajor = Number(Astro.generator.match(/^Astro v(\d+)/)?.[1])
+const csp =
+	cspEnabled && astroMajor >= 6
+		? (
+				Astro as unknown as {
+					csp?: {
+						insertScriptHash(hash: string): void
+						insertStyleHash(hash: string): void
+						insertScriptResource(resource: string): void
+						insertStyleResource(resource: string): void
+					}
 				}
-			}
-		).csp
-	: undefined
+			).csp
+		: undefined
 if (csp) {
-	for (const { type, content } of getInlineContent(headItems)) {
+	for (const { type, content } of head.inline) {
 		const hashBuffer = await crypto.subtle.digest(
 			'SHA-256',
 			new TextEncoder().encode(content)
@@ -60,38 +69,24 @@ if (csp) {
 		else csp.insertStyleHash(`sha256-${hash}`)
 	}
 
-	for (const { type, url } of getExternalResources(headItems)) {
-		const resource = getCspSource(url)
+	for (const { type, url } of head.resources) {
+		const resource = getCspSource(url, {
+			documentUrl: Astro.url,
+			baseUrl: head.baseHref ?? baseUrl
+		})
 		if (!resource) continue
 		if (type === 'script') csp.insertScriptResource(resource)
 		else csp.insertStyleResource(resource)
-	}
-}
-
-function getCspSource(url: string): string | undefined {
-	const trimmed = url.trim()
-	if (!trimmed) return undefined
-	if (trimmed.startsWith('//')) return new URL(`https:${trimmed}`).origin
-	if (trimmed.startsWith('/') || trimmed.startsWith('./')) return "'self'"
-
-	try {
-		const parsed = new URL(trimmed)
-		if (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-			return parsed.origin
-		if (parsed.protocol === 'data:' || parsed.protocol === 'blob:')
-			return parsed.protocol
-	} catch {
-		return "'self'"
 	}
 }
 ---
 
 {
 	omitHeadTags ? (
-		<Fragment set:html={head} />
+		<Fragment set:html={head.html} />
 	) : (
 		<head>
-			<Fragment set:html={head} />
+			<Fragment set:html={head.html} />
 		</head>
 	)
 }

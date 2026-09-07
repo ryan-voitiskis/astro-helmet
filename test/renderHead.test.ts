@@ -115,7 +115,7 @@ describe('renderHead', () => {
 	})
 
 	it('Deduplicates canonical and resource-hint links with last-write-wins', () => {
-		const params = {
+		const params: HeadItems = {
 			title: 'My Site Title',
 			link: [
 				{ rel: 'canonical', href: 'https://example.com/old' },
@@ -140,7 +140,7 @@ describe('renderHead', () => {
 		expect(result).toContain(
 			'<link rel="canonical" href="https://example.com/new">'
 		)
-		expect(result.match(/rel="preconnect"/g)).toHaveLength(1)
+		expect(result.match(/rel="preconnect"/g)).toHaveLength(2)
 		expect(result).toContain(
 			'<link rel="preconnect" href="https://cdn.example.com" crossorigin="anonymous">'
 		)
@@ -164,7 +164,7 @@ describe('renderHead', () => {
 	})
 
 	it('Deduplicates href-less responsive image preloads', () => {
-		const params = {
+		const params: HeadItems = {
 			title: 'Responsive Preloads',
 			link: [
 				{
@@ -235,7 +235,7 @@ describe('renderHead', () => {
 		expect(result).toContain(
 			'<style>body::before { content: "<\\/style>"; }</style>'
 		)
-		expect(result).toContain('<script>console.log("<\\/script>")</script>')
+		expect(result).toContain('<script>console.log("<\\/SCRIPT>")</script>')
 		expect(result).toContain(
 			'<noscript>&lt;p&gt;Please enable JavaScript&lt;/p&gt;</noscript>'
 		)
@@ -472,8 +472,9 @@ describe('renderHead', () => {
 			meta: [{ name: 'description', content: 'My site description' }],
 			script: [{ innerHTML: 'console.log("Hello, world!")' }]
 		}
-		function applyPriority(tag: Tag): Required<Tag> {
-			if (typeof tag.priority === 'number') return tag as Required<Tag>
+		function applyPriority(tag: Tag): Tag & { priority: number } {
+			if (typeof tag.priority === 'number')
+				return tag as Tag & { priority: number }
 			let priority: number
 			switch (tag.tagName) {
 				case 'script':
@@ -822,8 +823,9 @@ describe('JSON-LD', () => {
 			title: 'My Article',
 			jsonLd: { '@type': 'Article', headline: 'My Article' }
 		}
-		function applyPriority(tag: Tag): Required<Tag> {
-			if (typeof tag.priority === 'number') return tag as Required<Tag>
+		function applyPriority(tag: Tag): Tag & { priority: number } {
+			if (typeof tag.priority === 'number')
+				return tag as Tag & { priority: number }
 			let priority: number
 			if (tag.type === 'application/ld+json') priority = -10
 			else if (tag.tagName === 'title') priority = 0
@@ -867,7 +869,7 @@ describe('JSON-LD', () => {
 				'@type': 'Article',
 				'@context': 'https://evil.com'
 			}
-		} as HeadItems
+		} as unknown as HeadItems
 		const result = renderHead(params)
 		expect(result).toContain('"@context":"https://schema.org"')
 		expect(result).not.toContain('evil.com')

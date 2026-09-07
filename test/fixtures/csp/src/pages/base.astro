@@ -1,0 +1,19 @@
+---
+import Helmet from 'astro-helmet'
+
+const headItems = {
+	title: 'Effective base',
+	base: [
+		{ href: 'https://old.example.test/' },
+		{ href: 'https://assets.example.test/assets/' }
+	],
+	script: [{ src: 'base.js' }],
+	link: [{ rel: 'stylesheet', href: '/base.css' }]
+}
+---
+
+<!doctype html>
+<html lang="en">
+	<Helmet {headItems} options={{ csp: true, validate: false }} />
+	<body><p id="after">AFTER</p></body>
+</html>

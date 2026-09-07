@@ -58,9 +58,13 @@ const headItems = {
 
 Any attribute can be added to a head item. Simply provide the attribute as a key-value pair in the object.
 
+Boolean values use presence/absence semantics only for HTML boolean attributes: `async: true` renders `async`, and `defer: false` omits `defer`. Other attributes preserve the value as text, so `content: false` and `'data-enabled': false` render `content="false"` and `data-enabled="false"`.
+
 `'innerHTML', 'textContent', 'priority', 'tagName', 'key'` are reserved keys and cannot be used as attributes.
 
-To add content to a tag, prefer `textContent`. For `<script>` and `<style>`, `textContent` preserves the code text while escaping closing-tag sequences such as `</script>`. Script text that contains the HTML parser sequence `<!--` followed by `<script>` is rejected because it can consume the rest of the document; use an external script instead. For tags like `<noscript>`, `textContent` is HTML-escaped.
+To add content to a tag, prefer `textContent`. For `<script>` and `<style>`, it escapes parser-relevant closing-tag sequences such as `</script>` while preserving their letter case. Script text that contains the HTML parser sequence `<!--` followed by a `<script` opening sequence is rejected, including whitespace and carriage-return variants, because it can consume the rest of the document. For tags like `<noscript>`, `textContent` is HTML-escaped.
+
+Inline text is normalized like HTML parsing: CRLF and CR become LF, and literal NUL characters become U+FFFD. CSP hashes use the same final text. Closing-tag escaping changes the source spelling, so constructs that inspect raw source, such as `String.raw` templates, may observe the added backslash. Use an external script when exact source bytes or raw-template behavior matter. Use `jsonLd` for structured data instead of assembling a script string.
 
 Use `innerHTML` only when you intentionally need raw, trusted markup. Do not pass CMS or user-provided strings into `innerHTML` or inline event-handler attributes.
 
@@ -181,6 +185,10 @@ const headItems = createSeoHead({
 <Helmet headItems={[layoutHeadItems, pageHeadItems]} />
 ```
 
+A non-empty page image list replaces the complete layout image list, including its descriptions and dimensions. A page that omits images or supplies an empty list inherits the layout images. Raw `meta` overrides containing `og:image` (or its `og:image:url` alias) use the same replacement rule, including inside `createSeoHead()`. To render several images, supply them together in one source; each image's structured properties stay with that image.
+
+The `noindex` and `nofollow` shortcuts override their corresponding directives in both string and object `robots` values. Unrelated directives are retained. For example, `robots: 'index, max-image-preview:large', noindex: true` produces `max-image-preview:large, noindex`. Without shortcuts, string directives are preserved exactly. Title templates replace every `%s` with the literal title, including any dollar signs.
+
 You can also pass an array of `headItems` to the `Helmet` component:
 
 ```astro
@@ -293,11 +301,16 @@ When provided with an array of `headItems`, `astro-helmet` will merge the items 
 `headItems.meta` are deduplicated by `name`, `property`, `http-equiv` and `charset`.
 Meta items later in the array replace earlier items. `name` and `http-equiv` matching is case-insensitive. `media` is part of the deduplication key, so media-specific tags such as multiple `theme-color` metas are preserved. Meta tags without any of these keys (e.g. `itemprop`-only tags) are never deduplicated.
 
+Open Graph images are grouped: repeated image roots within a source are preserved, and repeated structured properties replace earlier properties of the same image. A later source containing an image root replaces the earlier image list. A source containing only image structured properties extends or overrides the final inherited image. An explicitly keyed image root replaces its entire group.
+
 `headItems.link` deduplicates:
 
 - `rel="canonical"` links, keeping the last one.
-- `rel="preconnect"` and `rel="dns-prefetch"` links with the same `href`, keeping the last one.
-- `rel="preload"` and `rel="modulepreload"` links with the same `href`, `as`, `type`, `crossorigin`, `media`, `imagesrcset`, and `imagesizes`, keeping the last one. Responsive image preloads without `href` are deduplicated by `as`, `type`, `crossorigin`, `media`, `imagesrcset`, and `imagesizes`.
+- `rel="preconnect"` links with the same `href` and CORS mode, keeping the last one.
+- `rel="dns-prefetch"` links with the same `href`, keeping the last one.
+- `rel="preload"` and `rel="modulepreload"` links with the same `href`, `as`, `type`, CORS mode, `media`, `imagesrcset`, and `imagesizes`, keeping the last one. Responsive image preloads without `href` use the remaining attributes as their identity.
+
+CORS identity follows the attribute's meaning: an absent attribute, anonymous CORS (`crossorigin=""` or `"anonymous"`), and `"use-credentials"` remain distinct. Module preloads use anonymous CORS when the attribute is absent. Browser preload reuse still depends on the eventual request and browser behavior.
 
 Any `meta`, `link`, `style`, `script`, or `noscript` item may provide `key` to opt into explicit last-write-wins deduplication:
 
@@ -369,6 +382,28 @@ Validation returns structured issues with `code`, `severity`, `message`, `tagNam
 
 Set `requireOpenGraphImage: true` if every shareable page in your project should provide `og:image`. By default, image-less website pages are allowed so dev validation does not warn on simple pages that still have useful `og:title`, `og:type`, and `og:url` tags.
 
+The component supplies `Astro.url` as the document URL. Standalone validation can take `documentUrl` separately from `baseUrl` when a CDN base differs from the page origin. Validation uses the final merged `<base href>` when present. With `requireSri: true`, scheme-relative URLs such as `//cdn.example.com/app.js` are checked even without a base; an unknown document origin is treated conservatively as external.
+
+#### `baseUrl`
+
+When a `<base>` is rendered outside Helmet, supply its effective URL with `options.baseUrl`. This lets CSP registration and validation resolve relative resources against the same base as the browser. The option does not render a base element. A base rendered by Helmet takes precedence.
+
+```astro
+<head>
+  <base href="https://cdn.example.com/assets/" />
+  <Helmet
+    {headItems}
+    options={{
+      omitHeadTags: true,
+      csp: true,
+      baseUrl: 'https://cdn.example.com/assets/'
+    }}
+  />
+</head>
+```
+
+Keep the effective base before URL-bearing elements. Use a single effective base across the document.
+
 #### `omitHeadTags`
 
 By default, `astro-helmet` will render the <head> opening and closing tags around the head items. If you want it to render only the head items, set `omitHeadTags` to `true`.
@@ -395,6 +430,8 @@ When using `omitHeadTags`, keep `<Helmet />` near the top of your manual `<head>
 #### `applyPriority()`
 
 The `applyPriority` option allows you to customize the priority of head items. It takes a function that accepts a `Tag` object and returns a `Tag` object with the priority applied.
+
+The callback runs once per final deduplicated tag, before sorting and serialization. If it also changes content or resource URLs, rendering and CSP registration both use the returned tag. Keep ordering changes consistent with HTML requirements such as placing the base before relative resources. Validation checks the supplied head items before this callback.
 
 The default ordering follows Harry Roberts' [Get Your Head Straight](https://speakerdeck.com/csswizardry/get-your-head-straight) head-order model: document metadata first, early connection hints, async work, blocking work, future-navigation hints, then SEO/social metadata. It is a safe default ordering, not an auto-optimizer. Use explicit priorities when you have measured that a page needs a different critical path.
 
@@ -443,6 +480,8 @@ Leave this disabled unless your Astro project has `security.csp` configured. Ast
 
 Astro CSP is available in Astro 6 and newer. In Astro 4 and 5 this option is a no-op. Astro CSP is also a build/preview feature rather than a dev-server feature, and Astro documents limitations with client-side routing.
 
+**Registration is only one part of CSP enforcement.** Astro controls policy delivery. Its static output can place the CSP meta element after head scripts and styles; this was reproduced with Astro 7.3.1. A meta policy only governs content parsed after it and does not protect preceding head resources. For protection from the start of parsing, deliver the generated policy as a `Content-Security-Policy` response header through your server, adapter, or hosting configuration, or arrange an equivalent policy before the protected elements. Verify the deployed response and both allowed and blocked resources. See the [CSP meta-delivery rules](https://w3c.github.io/webappsec-csp/#meta-element) and [Astro CSP configuration](https://docs.astro.build/en/reference/configuration-reference/#securitycsp). Helmet does not move Astro's generated policy or set response headers.
+
 `astro-helmet` registers:
 
 - Inline `<style>`, inline `<script>`, and JSON-LD hashes.
@@ -452,6 +491,8 @@ Astro CSP is available in Astro 6 and newer. In Astro 4 and 5 this option is a n
 - `rel="modulepreload"` links with script-like destinations as script resources and `as="style"` as a style resource. JSON and text module destinations are not registered because Astro's helper API does not expose their `connect-src` directives.
 
 It does not infer broader CSP directives from icons, images, fonts, analytics endpoints, or connection hints.
+
+Hashes describe the normalized, serialized content after `applyPriority`. Resource sources resolve against the final merged base and document URL; cross-origin bases register the actual HTTP(S) origin rather than `'self'`. Scheme-relative resources inherit the base scheme. Malformed resources do not broaden the policy. Raw `innerHTML`, inline JavaScript, and resource URLs must still be trusted; automatic registration authorizes the supplied content and is not a sanitizer.
 
 For CDN scripts and styles, combine browser-level SRI attributes with validation:
 
