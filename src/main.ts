@@ -4,7 +4,7 @@ const DEFAULT_VIEWPORT = {
 	content: 'width=device-width, initial-scale=1'
 }
 
-// Only HTML boolean attributes use presence/absence semantics. In particular,
+// HTML boolean attributes use presence/absence semantics. In particular,
 // meta content, data-* and ARIA attributes must preserve boolean values as text.
 const BOOLEAN_ATTRIBUTES = new Set([
 	'allowfullscreen',
@@ -32,6 +32,10 @@ const BOOLEAN_ATTRIBUTES = new Set([
 	'reversed',
 	'selected'
 ])
+
+// Preserve boolean conveniences for presence-like enumerations while allowing
+// string values such as hidden="until-found" to serialize unchanged.
+const BOOLEAN_CONVENIENCE_ATTRIBUTES = new Set(['hidden', 'crossorigin'])
 
 const VALID_PRELOAD_AS_VALUES = new Set([
 	'fetch',
@@ -87,7 +91,7 @@ export type HelmetOptions = {
 	validate?: boolean | HeadValidationOptions
 }
 
-export type CrossOrigin = 'anonymous' | 'use-credentials' | ''
+export type CrossOrigin = 'anonymous' | 'use-credentials' | '' | false
 
 export type FetchPriority = 'high' | 'low' | 'auto'
 
@@ -218,7 +222,6 @@ export type ModulePreloadOptions = ResourceHintOptions & {
 
 export type PreloadFontOptions = ResourceHintOptions & {
 	type?: string
-	crossorigin?: CrossOrigin | false
 }
 
 export type PreloadImageOptions = ResourceHintOptions & {
@@ -757,12 +760,15 @@ export function validateHeadItems(
 	items.script = deduplicateKeyedItems(items.script)
 	items.noscript = deduplicateKeyedItems(items.noscript)
 	const base = items.base.at(-1)
-	if (base && hasAttr(base, 'href')) {
-		validationOptions.baseUrl = resolveUrlString(
-			base.href,
-			options.documentUrl ?? options.baseUrl
-		)
-	}
+	// A baseUrl alone retains its legacy document-origin meaning. Providing both
+	// URLs explicitly describes the browser's effective base, including a manual
+	// first <base> outside Helmet that overrides Helmet's own later element.
+	validationOptions.baseUrl =
+		options.documentUrl !== undefined && options.baseUrl !== undefined
+			? options.baseUrl
+			: base && hasAttr(base, 'href')
+				? base.href
+				: options.baseUrl
 	const issues: HeadValidationIssue[] = []
 
 	if (!items.title.trim()) {
@@ -792,6 +798,18 @@ export function validateHeadItems(
 	}
 
 	const hasNoindex = hasRobotsDirective(items.meta, 'noindex')
+	if (validationOptions.baseUrl !== undefined) {
+		validateBaseUrl(
+			toUrlString(validationOptions.baseUrl),
+			validationOptions.documentUrl,
+			options.documentUrl !== undefined && options.baseUrl !== undefined
+				? 'options.baseUrl'
+				: base && hasAttr(base, 'href')
+					? `base[${items.base.length - 1}].href`
+					: 'options.baseUrl',
+			issues
+		)
+	}
 	validateMetaItems(items.meta, issues, validationOptions)
 	validateLinkItems(items.link, issues, validationOptions, hasNoindex)
 	validateScriptItems(items.script, issues, validationOptions)
@@ -801,6 +819,28 @@ export function validateHeadItems(
 	validateJsonLd(items.jsonLd, issues)
 
 	return issues
+}
+
+// Keep legacy validate.baseUrl as the document origin while making the
+// component's explicit effective base authoritative. Undefined option fields
+// must not erase context supplied by the component.
+export function getComponentValidationOptions(
+	options: HelmetOptions,
+	documentUrl: URL,
+	baseHref?: string
+): HeadValidationOptions {
+	const validation =
+		typeof options.validate === 'object' ? options.validate : {}
+	const origin = validation.documentUrl ?? validation.baseUrl ?? documentUrl
+	return {
+		...validation,
+		documentUrl: origin,
+		baseUrl:
+			options.baseUrl ??
+			(validation.documentUrl !== undefined ? validation.baseUrl : undefined) ??
+			baseHref ??
+			origin
+	}
 }
 
 function validateMetaItems(
@@ -1236,10 +1276,7 @@ function validateUrlValue(
 		return false
 	}
 	try {
-		const parsed = parseResourceUrl(
-			value,
-			options.baseUrl ?? options.documentUrl
-		)
+		const parsed = parseResourceUrl(value, options)
 		if (!parsed) return true
 		if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return true
 		if (parsed.protocol === 'data:' || parsed.protocol === 'blob:') return true
@@ -1261,6 +1298,27 @@ function validateUrlValue(
 		})
 		return false
 	}
+}
+
+function validateBaseUrl(
+	value: string,
+	documentUrl: string | URL | undefined,
+	path: string,
+	issues: HeadValidationIssue[]
+): void {
+	try {
+		const parsed = parseResourceUrl(value, { documentUrl })
+		if (!parsed || !['data:', 'javascript:'].includes(parsed.protocol)) return
+	} catch {
+		// Report the base itself without invalidating independent resource URLs.
+	}
+	issues.push({
+		code: 'invalid-url',
+		severity: 'warning',
+		tagName: 'base',
+		path,
+		message: `Invalid or unsupported base URL: ${value}. Use a valid base for consistent browser resolution.`
+	})
 }
 
 function isSriRelevantLink(link: LinkItem): boolean {
@@ -1568,7 +1626,7 @@ function isExternalHttpUrl(
 ): boolean {
 	let url: URL | undefined
 	try {
-		url = parseResourceUrl(value, options.baseUrl ?? options.documentUrl)
+		url = parseResourceUrl(value, options)
 	} catch {
 		return false
 	}
@@ -1589,12 +1647,39 @@ function isExternalHttpUrl(
 // external. Invalid absolute/network URLs still throw instead of becoming self.
 function parseResourceUrl(
 	value: string,
-	baseUrl?: string | URL
+	options: Pick<HeadValidationOptions, 'documentUrl' | 'baseUrl'>
 ): URL | undefined {
-	if (baseUrl) return new URL(value, toUrlString(baseUrl))
+	const documentUrl = parseDocumentUrl(options.documentUrl)
+	let baseUrl = documentUrl
+	if (options.baseUrl !== undefined) {
+		try {
+			const value = toUrlString(options.baseUrl)
+			const candidate = new URL(
+				!documentUrl && value.startsWith('//') ? `https:${value}` : value,
+				documentUrl
+			)
+			// Follow HTML's document-URL fallback for malformed, data: and
+			// javascript: bases. Some browsers instead block relative requests;
+			// absolute resources remain independent in either case.
+			if (!['data:', 'javascript:'].includes(candidate.protocol))
+				baseUrl = candidate
+		} catch {
+			/* Use the HTML standard's document-URL fallback. */
+		}
+	}
+	if (baseUrl) return new URL(value, baseUrl)
 	if (value.startsWith('//')) return new URL(`https:${value}`)
 	if (/^[a-z][a-z\d+.-]*:/i.test(value)) return new URL(value)
 	return undefined
+}
+
+function parseDocumentUrl(value?: string | URL): URL | undefined {
+	if (value === undefined) return undefined
+	try {
+		return new URL(toUrlString(value))
+	} catch {
+		return undefined
+	}
 }
 
 export function getCspSource(
@@ -1604,14 +1689,10 @@ export function getCspSource(
 	const trimmed = value.trim()
 	if (!trimmed) return undefined
 	try {
-		const base =
-			options.baseUrl === undefined
-				? options.documentUrl
-				: new URL(toUrlString(options.baseUrl), options.documentUrl)
-		const parsed = parseResourceUrl(trimmed, base)
+		const parsed = parseResourceUrl(trimmed, options)
 		if (!parsed) return undefined
 		if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-			return parsed.origin === new URL(options.documentUrl).origin
+			return parsed.origin === parseDocumentUrl(options.documentUrl)?.origin
 				? "'self'"
 				: parsed.origin
 		}
@@ -1642,10 +1723,13 @@ function mergeMetaSources(
 	previous: BaseItem[],
 	incoming: BaseItem[]
 ): BaseItem[] {
-	// A later image list replaces the complete earlier list, including dimensions
-	// and descriptions. Partial property overrides still extend the final image.
+	// An unkeyed image list replaces the earlier list, including dimensions and
+	// descriptions. Explicit roots upsert only their own group; partial property
+	// overrides still extend the final image.
 	return [
-		...(incoming.some(isImageRoot)
+		...(incoming.some(
+			(meta) => isImageRoot(meta) && !getExplicitDeduplicationKey(meta)
+		)
 			? previous.filter((meta) => !isImageProperty(meta))
 			: previous),
 		...incoming
@@ -1653,37 +1737,75 @@ function mergeMetaSources(
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
-	const deduplicated: BaseItem[][] = []
-	const itemIndexByKey = new Map<string, number>()
+	const groups: BaseItem[][] = []
+	const byKey = new Map<string, { group: BaseItem[]; item: BaseItem }>()
 	let imageGroup: BaseItem[] | undefined
 
-	for (const meta of metaItems) {
-		if (!isImageRoot(meta) && isImageProperty(meta) && imageGroup) {
-			const key = getMetaDeduplicationKey(meta)
-			const existing = imageGroup.findIndex(
-				(item) => !isImageRoot(item) && getMetaDeduplicationKey(item) === key
-			)
-			if (existing === -1) imageGroup.push(meta)
-			else imageGroup[existing] = meta
-			continue
-		}
-
-		const root = isImageRoot(meta)
-		const group = [meta]
-		const key = root
-			? getExplicitDeduplicationKey(meta)
-			: getMetaDeduplicationKey(meta)
-		const existingIndex = key ? itemIndexByKey.get(key) : undefined
-		if (existingIndex !== undefined) {
-			deduplicated[existingIndex] = group
-		} else {
-			if (key) itemIndexByKey.set(key, deduplicated.length)
-			deduplicated.push(group)
-		}
-		if (root) imageGroup = group
+	function forget(item: BaseItem) {
+		const key = getMetaDeduplicationKey(item)
+		if (key && byKey.get(key)?.item === item) byKey.delete(key)
 	}
 
-	return deduplicated.flat()
+	function clear(group: BaseItem[]) {
+		for (const item of group) forget(item)
+		group.length = 0
+		if (imageGroup === group) imageGroup = undefined
+	}
+
+	for (const meta of metaItems) {
+		const root = isImageRoot(meta)
+		const structured = !root && isImageProperty(meta)
+		const explicit = getExplicitDeduplicationKey(meta)
+		const key =
+			explicit ??
+			(!root && (!structured || !imageGroup)
+				? getMetaDeduplicationKey(meta)
+				: undefined)
+		let target = structured ? imageGroup : undefined
+		const local =
+			!explicit &&
+			target?.find(
+				(item) =>
+					!isImageRoot(item) &&
+					getMetaDeduplicationKey(item) === getMetaDeduplicationKey(meta)
+			)
+		const existing = key
+			? byKey.get(key)
+			: local && target
+				? { group: target, item: local }
+				: undefined
+
+		if (existing) {
+			const { group, item } = existing
+			if (isImageRoot(item)) {
+				// Replacing a root removes its entire group and invalidates the
+				// current-image pointer. Reuse its output slot for a new root/meta.
+				clear(group)
+				if (!structured) target = group
+				else target = imageGroup
+			} else if (group === target || (!target && group.length === 1)) {
+				forget(item)
+				group[group.indexOf(item)] = meta
+				if (root) imageGroup = group
+				if (key) byKey.set(key, { group, item: meta })
+				continue
+			} else {
+				// A keyed structured property belongs to its new image, so remove
+				// it from the old group rather than changing its meaning in place.
+				forget(item)
+				group.splice(group.indexOf(item), 1)
+			}
+		}
+
+		if (!target) {
+			target = []
+			groups.push(target)
+		}
+		target.push(meta)
+		if (root) imageGroup = target
+		if (key) byKey.set(key, { group: target, item: meta })
+	}
+	return groups.flat()
 }
 
 function getMetaDeduplicationKey(meta: BaseItem): string | undefined {
@@ -1753,7 +1875,9 @@ function getLinkDeduplicationKey(link: BaseItem): string | undefined {
 	const rels = getRelTokens(link)
 	const href = normaliseAttrValue(link.href)
 	const media = normaliseAttrValue(link.media)
-	const as = normaliseAttrValue(link.as).toLowerCase()
+	const as =
+		normaliseAttrValue(link.as).toLowerCase() ||
+		(rels.includes('modulepreload') ? 'script' : '')
 	const type = normaliseAttrValue(link.type).toLowerCase()
 	const crossorigin = getCrossOriginMode(link)
 	const imagesrcset = normaliseAttrValue(link.imagesrcset)
@@ -1808,10 +1932,7 @@ export function renderAttrs(item: BaseItem | ContentItem): string {
 		)
 		.filter(([key]) => isValidAttributeName(key))
 		.map(([key, value]) => {
-			if (
-				typeof value === 'boolean' &&
-				BOOLEAN_ATTRIBUTES.has(key.toLowerCase())
-			)
+			if (typeof value === 'boolean' && usesBooleanPresence(key))
 				return value ? key : ''
 			else if (value === null || value === undefined) return ''
 			else return `${key}="${escapeHtml(String(value))}"`
@@ -1850,7 +1971,18 @@ function escapeRawText(content: string, tagName: 'script' | 'style'): string {
 }
 
 function hasUnsafeScriptTextContent(content: string): boolean {
-	return /<!--[\s\S]*<script(?=[\t\n\r\f />])/i.test(content)
+	let escaped = false
+	for (let index = 0; index < content.length; index++) {
+		if (!escaped && content.startsWith('<!--', index)) escaped = true
+		else if (escaped && content.startsWith('-->', index)) escaped = false
+		else if (
+			escaped &&
+			content[index] === '<' &&
+			/^<script(?=[\t\n\r\f />])/i.test(content.slice(index, index + 8))
+		)
+			return true
+	}
+	return false
 }
 
 function normalizeHtmlText(content: string): string {
@@ -1859,7 +1991,18 @@ function normalizeHtmlText(content: string): string {
 }
 
 function hasAttr(item: BaseItem | ContentItem, key: string): boolean {
-	return item[key] !== null && item[key] !== undefined
+	return (
+		item[key] !== null &&
+		item[key] !== undefined &&
+		!(item[key] === false && usesBooleanPresence(key))
+	)
+}
+
+function usesBooleanPresence(key: string): boolean {
+	const name = key.toLowerCase()
+	return (
+		BOOLEAN_ATTRIBUTES.has(name) || BOOLEAN_CONVENIENCE_ATTRIBUTES.has(name)
+	)
 }
 
 function hasNonEmptyAttr(item: BaseItem | ContentItem, key: string): boolean {

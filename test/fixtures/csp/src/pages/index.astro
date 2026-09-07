@@ -19,7 +19,11 @@ const headItems: HeadItems[] = [
 				integrity: `sha256-${createHash('sha256').update(external).digest('base64')}`,
 				crossorigin: 'anonymous'
 			},
-			{ textContent: 'window.__closingTag = "</SCRIPT>";\r\n/* null:\0 */' }
+			{ textContent: 'window.__closingTag = "</SCRIPT>";\r\n/* null:\0 */' },
+			{
+				textContent:
+					'window.__closedComment = "<!-- closed --> later <script>";'
+			}
 		],
 		style: [{ textContent: 'body { color: rgb(1, 2, 3); }\r\n/* null:\0 */' }],
 		jsonLd: { '@type': 'Thing', name: '</script><!--<script\r>' }

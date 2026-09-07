@@ -29,7 +29,7 @@ const page = createSeoHead({
 	noindex: true,
 	nofollow: true,
 	openGraph: { image: 'https://example.com/page.png' },
-	meta: [{ name: 'flag', content: false }]
+	meta: [{ name: 'flag', content: false, hidden: false }]
 })
 const resources = {
 	link: [
@@ -41,10 +41,17 @@ const resources = {
 		preloadImage('/both.png'),
 		preloadImage('/both.png', { crossorigin: '' }),
 		modulepreload('/consumer.js'),
+		modulepreload('/consumer.js', { as: 'script', crossorigin: 'anonymous' }),
 		modulepreload('/consumer.css', { as: 'style' })
 	],
 	style: [{ textContent: 'body { color: green; }\r\n' }],
-	script: [{ textContent: 'window.__consumer = "</SCRIPT>";\r\n' }],
+	script: [
+		{ textContent: 'window.__consumer = "</SCRIPT>";\r\n' },
+		{ src: '//cdn.example.test/scheme.js', crossorigin: false },
+		{
+			textContent: 'window.__closedComment = "<!-- closed --> later <script>";'
+		}
+	],
 	jsonLd: { '@type': 'Thing', name: '<!--<script>' }
 }
 ---

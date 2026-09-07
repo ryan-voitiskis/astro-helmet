@@ -39,6 +39,7 @@ function policy(node: DefaultTreeAdapterMap['node']): string | undefined {
 }
 
 test.beforeAll(async () => {
+	test.setTimeout(90_000)
 	output = await mkdtemp(join(tmpdir(), 'helmet-csp-browser-'))
 	await execFileAsync(
 		process.execPath,
@@ -55,7 +56,7 @@ test.beforeAll(async () => {
 		}
 	)
 	const pages = new Map<string, { html: string; csp: string }>()
-	for (const name of ['', 'base/', 'manual-base/']) {
+	for (const name of ['', 'base/', 'manual-base/', 'malformed-base/']) {
 		const html = await readFile(join(output, name, 'index.html'), 'utf8')
 		const csp = policy(parse(html))
 		expect(csp, `generated policy for ${name || '/'}`).toBeTruthy()
@@ -105,6 +106,7 @@ test('generated CSP authorizes normalized final content and blocks unauthorized 
 			transformed: Reflect.get(window, '__transformed'),
 			external: Reflect.get(window, '__external'),
 			closing: Reflect.get(window, '__closingTag'),
+			closedComment: Reflect.get(window, '__closedComment'),
 			original: Reflect.has(window, '__original'),
 			superseded: Reflect.has(window, '__superseded'),
 			unauthorized: Reflect.has(window, '__unauthorized'),
@@ -115,6 +117,7 @@ test('generated CSP authorizes normalized final content and blocks unauthorized 
 		transformed: true,
 		external: true,
 		closing: '</SCRIPT>',
+		closedComment: '<!-- closed --> later <script>',
 		original: false,
 		superseded: false,
 		unauthorized: false,
@@ -142,6 +145,40 @@ test('rendered SRI rejects modified external script bytes', async ({
 		false
 	)
 	expect(await page.evaluate(() => Reflect.get(window, '__boot'))).toBe(true)
+})
+
+test('a malformed base preserves independent CSP resources and the standard fallback', async ({
+	page
+}) => {
+	await page.route('https://assets.example.test/absolute.js', (route) =>
+		route.fulfill({
+			contentType: 'text/javascript',
+			body: 'window.__absoluteBase = true;'
+		})
+	)
+	await page.route(`${origin}/fallback.js`, (route) =>
+		route.fulfill({
+			contentType: 'text/javascript',
+			body: 'window.__fallbackBase = true;'
+		})
+	)
+	const response = await page.goto(`${origin}/malformed-base/`)
+	expect(response!.headers()['content-security-policy']).toContain("'self'")
+	const state = await page.evaluate(() => ({
+		absolute: Reflect.get(window, '__absoluteBase'),
+		fallback: Reflect.get(window, '__fallbackBase'),
+		data: Reflect.get(window, '__dataBase'),
+		base: document.baseURI
+	}))
+	// Chromium currently uses about:blank for this malformed base and cannot
+	// resolve relative requests. Firefox/WebKit follow HTML's document fallback.
+	expect([`${origin}/malformed-base/`, 'about:blank']).toContain(state.base)
+	expect(state).toEqual({
+		absolute: true,
+		fallback: state.base === 'about:blank' ? undefined : true,
+		data: true,
+		base: state.base
+	})
 })
 
 for (const path of ['base', 'manual-base']) {

@@ -94,6 +94,8 @@ try {
 		'imagesrcset="/hero.jpg 1x, /hero@2x.jpg 2x"',
 		'fetchpriority="high"',
 		'rel="modulepreload"',
+		'<script src="//cdn.example.test/scheme.js"></script>',
+		'window.__closedComment = "<!-- closed --> later <script>";',
 		'\\u003c!--\\u003cscript>',
 		'window.__consumer = "<\\/SCRIPT>";\n',
 		'id="after"'
@@ -101,6 +103,11 @@ try {
 		assert(html.includes(expected), `Astro ${astro} missing ${expected}`)
 	assert(!html.includes('stale-layout'), 'Stale image group survived')
 	assert(!html.includes('<!--<script>'), 'Unsafe JSON-LD reached HTML')
+	assert.equal(
+		(html.match(/href="\/consumer\.js"/g) || []).length,
+		1,
+		'Implicit and explicit module script destinations were not deduplicated'
+	)
 	assert.equal(
 		(html.match(/href="\/both\.png"/g) || []).length,
 		2,
@@ -117,6 +124,47 @@ try {
 		assert(
 			html.includes(`sha256-${hash}`),
 			'CSP hash does not match normalized final script'
+		)
+		assert(
+			html.includes('http://cdn.example.test'),
+			'Missing default HTTP document scheme'
+		)
+	}
+	if (Number(astro) >= 5) {
+		// Verify configured production origins rather than forcing HTTPS in the
+		// resource resolver. Astro 5 additionally exercises CSP on and off.
+		await writeFile(
+			join(app, 'astro.config.mjs'),
+			`import { defineConfig } from 'astro/config'; export default defineConfig({ site: 'https://site.example.test', ${astro === '5' ? 'experimental' : 'security'}: { csp: true } });`
+		)
+		run(process.execPath, [
+			join('node_modules/astro', astroPackage.bin.astro),
+			'build'
+		])
+		const productionHtml = await readFile(join(app, 'dist/index.html'), 'utf8')
+		const hash = createHash('sha256')
+			.update('window.__consumer = "<\\/SCRIPT>";\n')
+			.digest('base64')
+		assert(
+			productionHtml.includes('http-equiv="content-security-policy"'),
+			'Production CSP policy missing'
+		)
+		assert(
+			productionHtml.includes(`sha256-${hash}`),
+			'Production CSP registration was skipped'
+		)
+		assert(
+			productionHtml.includes('https://cdn.example.test'),
+			'Configured site scheme was ignored'
+		)
+		assert(
+			!productionHtml.includes('http://cdn.example.test'),
+			'HTTP scheme leaked into production CSP'
+		)
+		log(
+			astro === '5'
+				? 'PASS: Astro 5 experimental CSP enabled and disabled, configured HTTPS site'
+				: 'PASS: unconfigured HTTP and configured HTTPS site origins'
 		)
 	}
 	log(

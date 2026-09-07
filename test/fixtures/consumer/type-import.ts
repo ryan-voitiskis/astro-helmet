@@ -1,8 +1,10 @@
 import {
 	createSeoHead,
+	externalScript,
 	modulepreload,
 	preconnect,
 	preload,
+	preloadFont,
 	preloadImage,
 	validateHeadItems,
 	type HeadItems,
@@ -16,11 +18,13 @@ const items: HeadItems = createSeoHead({
 	robots: 'max-snippet:100'
 })
 items.link = [
-	preconnect('https://example.com'),
+	preconnect('https://example.com', { crossorigin: false }),
 	modulepreload('/app.js', { as: 'script' }),
 	preload('/font.woff2', { as: 'font' }),
+	preloadFont('/optional-cors.woff2', { crossorigin: false }),
 	preloadImage({ imagesrcset: '/1.jpg 1x, /2.jpg 2x' })
 ]
+items.script = [externalScript('/app.js', { crossorigin: false })]
 const options: HelmetOptions = {
 	csp: true,
 	applyPriority: (tag) => ({ ...tag, priority: tag.priority ?? 100 }),

@@ -145,7 +145,7 @@ describe('effective CSP URLs', () => {
 		['javascript:alert(1)', undefined, undefined],
 		['//[bad', undefined, undefined],
 		['https://[bad', undefined, undefined],
-		['app.js', 'https://[bad', undefined],
+		['app.js', 'https://[bad', "'self'"],
 		['', undefined, undefined]
 	])('resolves %s against base %s', (url, baseUrl, expected) => {
 		expect(
@@ -229,7 +229,7 @@ describe('SRI validation', () => {
 		).toEqual([expect.objectContaining({ code: 'missing-sri' })])
 	})
 
-	it('resolves a Helmet base against the document even when a manual base option is supplied', () => {
+	it('honors an explicit effective base before a later Helmet base', () => {
 		expect(
 			validateHeadItems(
 				{
@@ -244,7 +244,7 @@ describe('SRI validation', () => {
 					baseUrl: 'https://cdn.example.com/assets/'
 				}
 			)
-		).toEqual([])
+		).toEqual([expect.objectContaining({ code: 'missing-sri' })])
 	})
 
 	it.each(['//[bad', '//bad host/app.js', 'https://[bad'])(

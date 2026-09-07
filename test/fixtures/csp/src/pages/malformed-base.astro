@@ -1,0 +1,18 @@
+---
+import Helmet from 'astro-helmet'
+
+const headItems = {
+	title: 'Malformed base fallback',
+	base: [{ href: 'https://[bad' }],
+	script: [
+		{ src: 'https://assets.example.test/absolute.js' },
+		{ src: '/fallback.js' },
+		{ src: 'data:text/javascript,window.__dataBase%20%3D%20true%3B' }
+	]
+}
+---
+
+<html lang="en">
+	<Helmet {headItems} options={{ csp: true, validate: false }} />
+	<body><p id="after">AFTER</p></body>
+</html>
