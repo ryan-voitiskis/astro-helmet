@@ -84,6 +84,36 @@ try {
 		])
 	}
 	const html = await readFile(join(app, 'dist/index.html'), 'utf8')
+	const metadataHtml = await readFile(
+		join(app, 'dist/metadata-transitions/index.html'),
+		'utf8'
+	)
+	assert(
+		metadataHtml.includes(
+			'<meta property="og:image" content="/surviving-image.jpg">'
+		),
+		'Surviving image was lost'
+	)
+	assert(
+		metadataHtml.includes(
+			'<meta property="og:image:alt" content="Updated surviving alt">'
+		),
+		'Surviving image property was not updated'
+	)
+	assert(
+		metadataHtml.includes(
+			'<meta name="description" content="Retained metadata">'
+		),
+		'Replacement metadata was lost'
+	)
+	assert(
+		!/stale/i.test(metadataHtml),
+		'Stale image or property survived eviction'
+	)
+	assert(
+		!metadataHtml.includes('name="robots"'),
+		'Superseded robots metadata reappeared'
+	)
 	for (const expected of [
 		'<title>Cost $&amp; USD | Site</title>',
 		'<link rel="canonical" href="https://example.com/fixture">',

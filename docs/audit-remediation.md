@@ -21,7 +21,7 @@ The audit reviewed commit `5fbca6c85f454378819aac87eecc812e5f4ab722`. The change
 
 Expanded testing also exposed two related issues: Astro 5 has an experimental CSP API that can throw even though Helmet documents a no-op, and `Required<Tag>` made a priority callback require unrelated optional properties. Helmet feature-detects the CSP API, supports the Astro 5 experimental flag, and handles only Astro 5's explicit `CspNotEnabled` error as a no-op. The callback return type requires only `priority`.
 
-The subsequent review is addressed in [Review follow-up](review-followup.md), including URL precedence, explicit metadata keys, and compatibility decisions.
+The subsequent reviews are addressed in [Review follow-up](review-followup.md), including URL precedence, explicit metadata keys, and compatibility decisions. A second independent review produced 35 more regression tests covering standalone SRI origins, image-list replacement history, surviving image properties, and shared input objects. The packed-consumer harness also exercises the three reported regressions through public exports and rendered output.
 
 ## Reproducing verification
 
@@ -51,7 +51,7 @@ For example, with the corresponding Node version selected:
 ASTRO_VERSION=7 TYPESCRIPT_VERSION=6.0.3 node scripts/verify-consumer.mjs
 ```
 
-Local validation passed 252 unit/integration tests (including 1,728 parser-state combinations) and 24 browser tests. Coverage was 97.76% statements, 96.67% branches, 99.15% functions, and 98.81% lines. Packed consumers passed with Astro 4.16.19, 5.18.2, 6.4.8, and 7.3.1, including Node 24.14.0. Some current transitive Astro packages emit engine warnings on the older matrix runtimes; the tested builds and type checks pass. This does not establish support for every optional Astro subsystem on those older runtimes.
+Local validation passed 287 unit/integration tests (including 1,728 parser-state combinations) and 24 browser tests. Coverage was 97.79% statements, 96.69% branches, 100% functions, and 98.82% lines. Packed consumers passed with Astro 4.16.19, 5.18.2, 6.4.8, and 7.3.1, including Node 24.14.0. Some current transitive Astro packages emit engine warnings on the older matrix runtimes; the tested builds and type checks pass. This does not establish support for every optional Astro subsystem on those older runtimes.
 
 ## Integration limits
 

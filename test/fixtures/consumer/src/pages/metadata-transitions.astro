@@ -1,0 +1,47 @@
+---
+import Helmet, { validateHeadItems, type HeadItems } from 'astro-helmet'
+
+const sources: HeadItems[] = [
+	{
+		title: 'Metadata transitions',
+		meta: [{ key: 'shared', name: 'robots', content: 'noindex' }]
+	},
+	{
+		meta: [{ key: 'shared', property: 'og:image', content: '/stale-image.jpg' }]
+	},
+	{
+		meta: [
+			{ property: 'og:image', content: '/surviving-image.jpg' },
+			{ property: 'og:image:alt', content: 'Stale surviving alt' },
+			{
+				key: 'secondary',
+				property: 'og:image',
+				content: '/stale-secondary.jpg'
+			},
+			{ property: 'og:image:alt', content: 'Stale secondary alt' }
+		]
+	},
+	{
+		meta: [
+			{ key: 'secondary', name: 'description', content: 'Retained metadata' }
+		]
+	},
+	{ meta: [{ property: 'og:image:alt', content: 'Updated surviving alt' }] }
+]
+const issues = validateHeadItems(
+	{
+		title: 'Standalone SRI',
+		base: [{ href: 'https://cdn.example.test/assets/' }],
+		script: [{ src: 'https://cdn.example.test/assets/app.js' }]
+	},
+	{ requireDescription: false, requireSri: true }
+)
+if (issues[0]?.code !== 'missing-sri')
+	throw new Error('A head base incorrectly established the document origin')
+---
+
+<!doctype html>
+<html lang="en">
+	<Helmet headItems={sources} options={{ validate: false }} />
+	<body><h1>Metadata transitions</h1></body>
+</html>

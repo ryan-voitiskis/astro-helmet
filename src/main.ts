@@ -1633,7 +1633,9 @@ function isExternalHttpUrl(
 
 	if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:'))
 		return false
-	const documentUrl = options.documentUrl ?? options.baseUrl
+	// validateHeadItems already normalizes a caller's legacy baseUrl into
+	// documentUrl. An effective <base> alone cannot establish document ownership.
+	const documentUrl = options.documentUrl
 	if (!documentUrl) return true
 
 	try {
@@ -1726,14 +1728,15 @@ function mergeMetaSources(
 	// An unkeyed image list replaces the earlier list, including dimensions and
 	// descriptions. Explicit roots upsert only their own group; partial property
 	// overrides still extend the final image.
-	return [
-		...(incoming.some(
-			(meta) => isImageRoot(meta) && !getExplicitDeduplicationKey(meta)
-		)
-			? previous.filter((meta) => !isImageProperty(meta))
-			: previous),
-		...incoming
-	]
+	const replacesImages = incoming.some(
+		(meta) => isImageRoot(meta) && !getExplicitDeduplicationKey(meta)
+	)
+	// Resolve earlier key replacements before removing their image entries,
+	// or the ordinary metadata those entries superseded would reappear.
+	const inherited = replacesImages
+		? deduplicateMetaItems(previous).filter((meta) => !isImageProperty(meta))
+		: previous
+	return [...inherited, ...incoming]
 }
 
 function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
@@ -1741,15 +1744,28 @@ function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
 	const byKey = new Map<string, { group: BaseItem[]; item: BaseItem }>()
 	let imageGroup: BaseItem[] | undefined
 
-	function forget(item: BaseItem) {
+	function forget(item: BaseItem, group: BaseItem[]) {
 		const key = getMetaDeduplicationKey(item)
-		if (key && byKey.get(key)?.item === item) byKey.delete(key)
+		const entry = key ? byKey.get(key) : undefined
+		// The same input object can occur in more than one group.
+		if (key && entry?.item === item && entry.group === group) byKey.delete(key)
 	}
 
 	function clear(group: BaseItem[]) {
-		for (const item of group) forget(item)
+		for (const item of group) forget(item, group)
 		group.length = 0
-		if (imageGroup === group) imageGroup = undefined
+		if (imageGroup === group) {
+			imageGroup = undefined
+			// Later property-only sources extend the final surviving image. Empty
+			// slots and ordinary metadata cannot become a structured-property group.
+			for (let index = groups.length - 1; index >= 0; index--) {
+				const candidate = groups[index]
+				if (candidate.length && isImageRoot(candidate[0])) {
+					imageGroup = candidate
+					break
+				}
+			}
+		}
 	}
 
 	for (const meta of metaItems) {
@@ -1778,13 +1794,13 @@ function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
 		if (existing) {
 			const { group, item } = existing
 			if (isImageRoot(item)) {
-				// Replacing a root removes its entire group and invalidates the
+				// Replacing a root removes its entire group and updates the
 				// current-image pointer. Reuse its output slot for a new root/meta.
 				clear(group)
 				if (!structured) target = group
 				else target = imageGroup
 			} else if (group === target || (!target && group.length === 1)) {
-				forget(item)
+				forget(item, group)
 				group[group.indexOf(item)] = meta
 				if (root) imageGroup = group
 				if (key) byKey.set(key, { group, item: meta })
@@ -1792,7 +1808,7 @@ function deduplicateMetaItems(metaItems: BaseItem[]): BaseItem[] {
 			} else {
 				// A keyed structured property belongs to its new image, so remove
 				// it from the old group rather than changing its meaning in place.
-				forget(item)
+				forget(item, group)
 				group.splice(group.indexOf(item), 1)
 			}
 		}
