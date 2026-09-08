@@ -1,0 +1,66 @@
+---
+import { createHash } from 'node:crypto'
+import Helmet, { type HeadItems, type Tag } from 'astro-helmet'
+
+const external = 'window.__external = true;'
+const headItems: HeadItems[] = [
+	{
+		title: 'CSP fixture',
+		script: [{ key: 'boot', textContent: 'window.__superseded = true;' }]
+	},
+	{
+		meta: [{ name: 'description', content: 'CSP enforcement fixture' }],
+		script: [
+			{ key: 'boot', textContent: 'window.__boot = true;\r\n' },
+			{ id: 'transformed', textContent: 'window.__original = true;' },
+			{
+				id: 'external',
+				src: 'https://old.example.test/app.js',
+				integrity: `sha256-${createHash('sha256').update(external).digest('base64')}`,
+				crossorigin: 'anonymous'
+			},
+			{ textContent: 'window.__closingTag = "</SCRIPT>";\r\n/* null:\0 */' },
+			{
+				textContent:
+					'window.__closedComment = "<!-- closed --> later <script>";'
+			}
+		],
+		style: [{ textContent: 'body { color: rgb(1, 2, 3); }\r\n/* null:\0 */' }],
+		jsonLd: { '@type': 'Thing', name: '</script><!--<script\r>' }
+	}
+]
+const applyPriority = (tag: Tag): Tag & { priority: number } => ({
+	...tag,
+	priority: tag.charset ? -10 : (tag.priority ?? 0),
+	...(tag.id === 'transformed'
+		? { textContent: 'window.__transformed = true;\r\n' }
+		: {}),
+	...(tag.id === 'external'
+		? { src: 'https://assets.example.test/app.js' }
+		: {})
+})
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<Helmet
+			{headItems}
+			options={{
+				csp: true,
+				applyPriority,
+				validate: false,
+				omitHeadTags: true
+			}}
+		/>
+		<script is:inline>
+			window.__unauthorizedHead = true
+		</script>
+	</head>
+	<body>
+		<p id="after">AFTER</p>
+		<script is:inline>
+			window.__unauthorized = true
+		</script>
+	</body>
+</html>

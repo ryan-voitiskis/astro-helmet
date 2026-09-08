@@ -1,0 +1,23 @@
+---
+import Helmet from 'astro-helmet'
+
+const baseUrl = 'https://assets.example.test/assets/'
+const headItems = {
+	title: 'Manual base',
+	base: [{ href: 'https://ignored.example.test/' }],
+	script: [{ src: 'base.js' }],
+	link: [{ rel: 'stylesheet', href: '/base.css' }]
+}
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<base href={baseUrl} />
+		<Helmet
+			{headItems}
+			options={{ csp: true, omitHeadTags: true, baseUrl, validate: false }}
+		/>
+	</head>
+	<body><p id="after">AFTER</p></body>
+</html>
